@@ -172,6 +172,8 @@ public enum CURLoption {
     CURLOPT_CAINFO,
     CURLOPT_FOLLOWLOCATION,
     CURLOPT_MAXREDIRS,
+    CURLOPT_PROTOCOLS,
+    CURLOPT_REDIR_PROTOCOLS,
     CURLOPT_HTTPHEADER,
     CURLOPT_HEADERFUNCTION,
     CURLOPT_HEADERDATA,
@@ -194,6 +196,13 @@ public enum CURLoption {
     CURLOPT_MAIL_RCPT,
     CURLOPT_USE_SSL,
 }
+
+// CURLPROTO_* bitmask values for CURLOPT_PROTOCOLS/CURLOPT_REDIR_PROTOCOLS —
+// hardcoded because these are C preprocessor macros, not CURLoption enum
+// members. Stable across libcurl versions (curl/curl.h's own CURLPROTO_
+// bit-position comments haven't changed since these were introduced).
+public const CURLPROTO_HTTP:  i64 = 1 << 0
+public const CURLPROTO_HTTPS: i64 = 1 << 1
 
 @foreign
 public enum CURLusessl {

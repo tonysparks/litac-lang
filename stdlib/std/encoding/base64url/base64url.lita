@@ -1,0 +1,66 @@
+import "std/encoding/base64"
+import "std/string"
+
+// Base64url (RFC 4648 §5) — the '-'/'_' alphabet with no padding, used
+// throughout JOSE (JWTs) and the Web Push API (VAPID keys, subscription
+// keys). Built as a thin wrapper over the existing standard-alphabet
+// std/encoding/base64, rather than a separate implementation.
+
+// Longest input this module's fixed decode buffer accepts. Callers here
+// only ever decode small fixed-size things (JWT segments, EC keys/points,
+// HKDF-sized secrets) — comfortably under this.
+public const MAX_DECODE_INPUT = 1024
+
+// Encodes len bytes of data as base64url into out, returning the encoded
+// length. out must be sized for the *standard* base64 encoding of len bytes
+// (padding included) — ((len + 2) / 3) * 4 — even though the returned
+// length (after padding is stripped) will be shorter.
+public func Base64UrlEncode(data: *const u8, len: i32, out: *char) : i32 {
+    var n = base64_encode(data as (*u8), out as (*u8), len as (usize), 0) as (i32)
+
+    for(var i = 0; i < n; i += 1) {
+        if(out[i] == '+') {
+            out[i] = '-'
+        }
+        else if(out[i] == '/') {
+            out[i] = '_'
+        }
+    }
+
+    while(n > 0 && out[n - 1] == '=') {
+        n -= 1
+    }
+    return n
+}
+
+// Decodes a base64url string (with or without trailing padding) into out.
+// out must point to a buffer of at least ((str.length + 3) / 4) * 3 bytes.
+// Returns the decoded length, or -1 if str is longer than MAX_DECODE_INPUT.
+public func Base64UrlDecode(str: String, out: *u8) : i32 {
+    if(str.length < 0 || str.length > MAX_DECODE_INPUT) {
+        return -1
+    }
+
+    // +3 slack for restored padding, rounded up to a multiple of 4.
+    var buf: [MAX_DECODE_INPUT + 3]char
+    for(var i = 0; i < str.length; i += 1) {
+        var c = str.buffer[i]
+        if(c == '-') {
+            buf[i] = '+'
+        }
+        else if(c == '_') {
+            buf[i] = '/'
+        }
+        else {
+            buf[i] = c
+        }
+    }
+
+    var len = str.length
+    while(len % 4 != 0) {
+        buf[len] = '='
+        len += 1
+    }
+
+    return base64_decode(buf as (*const u8), out, len as (usize)) as (i32)
+}

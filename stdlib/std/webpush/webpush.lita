@@ -1,0 +1,351 @@
+import "std/crypto/ec"
+import "std/crypto/hkdf"
+import "std/crypto/aes"
+import "std/crypto/sha256"
+import "std/crypto/random"
+import "std/encoding/base64url"
+import "std/http/http"
+import "std/json"
+import "std/json/from_json"
+import "std/json/to_json"
+import "std/map"
+import "std/string"
+import "std/string/builder"
+import "std/string/buffer"
+import "std/libc"
+import "std/mem"
+import "std/time"
+
+// Web Push: VAPID (RFC 8292) request authentication and "aes128gcm"
+// message encryption (RFC 8291, which layers RFC 8188's generic encrypted
+// content-encoding over ECDH + HKDF). No third-party push service — POSTs
+// directly to whatever endpoint the browser's PushManager.subscribe()
+// returned, via std/http.
+
+public struct VapidConfig {
+    publicKey:  String // base64url, decodes to a 65-byte uncompressed EC point
+    privateKey: String // base64url, decodes to a 32-byte raw scalar
+    subject:    String // "mailto:contact@example.com" — required by RFC 8292
+}
+
+public struct PushSubscription {
+    endpoint: String
+    p256dh:   String // base64url, 65-byte uncompressed EC point
+    auth:     String // base64url, 16-byte authentication secret
+}
+
+public enum PushStatus {
+    OK,
+    GONE,  // HTTP 404/410 — subscription is dead, caller should delete it
+    ERROR,
+}
+
+public struct PushResult {
+    status:     PushStatus
+    httpStatus: i32
+}
+
+@json
+struct VapidJwtHeader {
+    typ: String = $"JWT"
+    alg: String = $"ES256"
+}
+
+@json
+struct VapidJwtClaims {
+    aud: String
+    exp: i64
+    sub: String
+}
+
+const RECORD_SIZE: u32 = 4096
+const PADDING_DELIMITER: u8 = 0x02_u8
+const HEADER_SIZE: i32 = 16 /*salt*/ + 4 /*rs*/ + 1 /*idlen*/ + EC_P256_PUBLIC_KEY_SIZE /*keyid*/
+
+// "WebPush: info" || 0x00 || ua_public(65) || as_public(65) — RFC 8291 §3.3.
+const KEY_INFO_MAX_LEN: i32 = 13 + 1 + EC_P256_PUBLIC_KEY_SIZE + EC_P256_PUBLIC_KEY_SIZE
+
+const VAPID_TTL_SECONDS: i64 = 12 * 60 * 60 // recommended max is 24h; well under it
+
+// Extracts scheme://host[:port] (no path) from a subscription endpoint URL
+// — the "aud" claim RFC 8292 requires. Returns false if url has no "://".
+public func extractOrigin(url: String, out: *StringBuilder) : bool {
+    var schemeEnd = url.indexOf($"://")
+    if(schemeEnd < 0) {
+        return false
+    }
+    var afterScheme = schemeEnd + 3
+    var rest = url.substring(afterScheme)
+    var pathIdx = rest.indexOf($"/")
+    var hostEnd = (pathIdx < 0) ? url.length : (afterScheme + pathIdx)
+
+    out.append("%.*s", hostEnd, url.buffer)
+    return true
+}
+
+// Builds and ES256-signs a VAPID JWT for the given audience. Returns "" on
+// failure.
+public func buildVapidJwt(vapid: *VapidConfig, audience: String, allocator: *const Allocator) : String {
+    var privKeyBytes: [EC_P256_PRIVATE_KEY_SIZE]u8
+    if(Base64UrlDecode(vapid.privateKey, privKeyBytes as (*u8)) != EC_P256_PRIVATE_KEY_SIZE) {
+        return $""
+    }
+    var pubKeyBytes: [EC_P256_PUBLIC_KEY_SIZE]u8
+    if(Base64UrlDecode(vapid.publicKey, pubKeyBytes as (*u8)) != EC_P256_PUBLIC_KEY_SIZE) {
+        return $""
+    }
+
+    var pair: EcKeyPair
+    if(!EcKeyPairFromRaw(privKeyBytes as (*const u8), pubKeyBytes as (*const u8), &pair)) {
+        return $""
+    }
+    defer pair.free()
+
+    var header = VapidJwtHeader{}
+    var headerJson = StringBuilderInit(64, allocator)
+    defer headerJson.free()
+    header.toJson(&headerJson)
+
+    var claims = VapidJwtClaims {
+        .aud = audience,
+        .exp = Now() + VAPID_TTL_SECONDS,
+        .sub = vapid.subject,
+    }
+    var claimsJson = StringBuilderInit(256, allocator)
+    defer claimsJson.free()
+    claims.toJson(&claimsJson)
+
+    // base64url segments are always shorter than 4*ceil(n/3) of the raw
+    // JSON they encode; 512 comfortably covers both header and claims.
+    var headerB64: [512]char
+    var headerB64Len = Base64UrlEncode(headerJson.buffer as (*const u8), headerJson.length, headerB64 as (*char))
+    var claimsB64: [512]char
+    var claimsB64Len = Base64UrlEncode(claimsJson.buffer as (*const u8), claimsJson.length, claimsB64 as (*char))
+
+    var signingInput = StringBuilderInit(headerB64Len + claimsB64Len + 1, allocator)
+    defer signingInput.free()
+    signingInput.append("%.*s.%.*s", headerB64Len, headerB64, claimsB64Len, claimsB64)
+
+    var sig: [ECDSA_P1363_SIGNATURE_SIZE]u8
+    if(!EcdsaSignP1363(&pair, signingInput.buffer as (*const u8), signingInput.length, sig as (*u8))) {
+        return $""
+    }
+
+    var sigB64: [128]char
+    var sigB64Len = Base64UrlEncode(sig as (*const u8), ECDSA_P1363_SIGNATURE_SIZE, sigB64 as (*char))
+
+    var jwt = StringBuilderInit(signingInput.length + 1 + sigB64Len, allocator)
+    jwt.append("%.*s.%.*s", signingInput.length, signingInput.buffer, sigB64Len, sigB64)
+    return jwt.toString()
+}
+
+// Encrypts payload per RFC 8291 ("aes128gcm"), writing the ready-to-POST
+// body (86-byte header || ciphertext||tag) into out. Deterministic given
+// asPair/salt — the caller-facing SendWebPush below generates both fresh
+// per call; this split exists so the algorithm itself can be tested
+// against RFC 8291 Appendix A's fixed test vector.
+public func encryptPayload(
+    subscription: *PushSubscription,
+    asPair: *EcKeyPair,
+    salt: *const u8,
+    payload: *const u8, payloadLen: i32,
+    allocator: *const Allocator,
+    out: *StringBuilder
+) : bool {
+    var uaPublicBytes: [EC_P256_PUBLIC_KEY_SIZE]u8
+    if(Base64UrlDecode(subscription.p256dh, uaPublicBytes as (*u8)) != EC_P256_PUBLIC_KEY_SIZE) {
+        return false
+    }
+    var authSecret: [16]u8
+    if(Base64UrlDecode(subscription.auth, authSecret as (*u8)) != 16) {
+        return false
+    }
+
+    var asPublicBytes: [EC_P256_PUBLIC_KEY_SIZE]u8
+    if(!asPair.exportPublicKey(asPublicBytes as (*u8))) {
+        return false
+    }
+
+    var uaPubOnly: EcKeyPair
+    if(!EcPublicKeyFromRaw(uaPublicBytes as (*const u8), &uaPubOnly)) {
+        return false
+    }
+    defer uaPubOnly.free()
+
+    var ecdhSecret: [EC_P256_PRIVATE_KEY_SIZE]u8
+    if(!EcdhDerive(asPair, &uaPubOnly, ecdhSecret as (*u8))) {
+        return false
+    }
+
+    // PRK_key = HKDF-Extract(salt=auth_secret, IKM=ecdh_secret)
+    var prkKey: Sha256Buf
+    if(!HkdfSha256Extract(authSecret as (*const u8), 16, ecdhSecret as (*const u8), EC_P256_PRIVATE_KEY_SIZE, &prkKey)) {
+        return false
+    }
+
+    // key_info = "WebPush: info" || 0x00 || ua_public || as_public
+    var keyInfo: [KEY_INFO_MAX_LEN]u8
+    var keyInfoLen = 0
+    var keyInfoPrefix = "WebPush: info"
+    var keyInfoPrefixLen = strlen(keyInfoPrefix) as (i32)
+    memcpy(keyInfo as (*void), keyInfoPrefix as (*const void), keyInfoPrefixLen as (usize))
+    keyInfoLen += keyInfoPrefixLen
+    keyInfo[keyInfoLen] = 0_u8
+    keyInfoLen += 1
+    memcpy((&keyInfo[keyInfoLen]) as (*void), uaPublicBytes as (*const void), EC_P256_PUBLIC_KEY_SIZE as (usize))
+    keyInfoLen += EC_P256_PUBLIC_KEY_SIZE
+    memcpy((&keyInfo[keyInfoLen]) as (*void), asPublicBytes as (*const void), EC_P256_PUBLIC_KEY_SIZE as (usize))
+    keyInfoLen += EC_P256_PUBLIC_KEY_SIZE
+
+    // IKM = HKDF-Expand(PRK_key, key_info, 32)
+    var ikm: [32]u8
+    if(!HkdfSha256Expand(prkKey.buffer as (*const u8), 32, keyInfo as (*const u8), keyInfoLen, ikm as (*u8), 32)) {
+        return false
+    }
+
+    // PRK = HKDF-Extract(salt, IKM) — RFC 8188's own HKDF, separate from
+    // the key-combining step above.
+    var prk: Sha256Buf
+    if(!HkdfSha256Extract(salt, 16, ikm as (*const u8), 32, &prk)) {
+        return false
+    }
+
+    var cekInfoStr = "Content-Encoding: aes128gcm"
+    var cekInfoLen = strlen(cekInfoStr) as (i32)
+    var cekInfo: [32]u8
+    memcpy(cekInfo as (*void), cekInfoStr as (*const void), cekInfoLen as (usize))
+    cekInfo[cekInfoLen] = 0_u8
+    cekInfoLen += 1
+
+    var cek: [AES128GCM_KEY_SIZE]u8
+    if(!HkdfSha256Expand(prk.buffer as (*const u8), 32, cekInfo as (*const u8), cekInfoLen, cek as (*u8), AES128GCM_KEY_SIZE)) {
+        return false
+    }
+
+    var nonceInfoStr = "Content-Encoding: nonce"
+    var nonceInfoLen = strlen(nonceInfoStr) as (i32)
+    var nonceInfo: [32]u8
+    memcpy(nonceInfo as (*void), nonceInfoStr as (*const void), nonceInfoLen as (usize))
+    nonceInfo[nonceInfoLen] = 0_u8
+    nonceInfoLen += 1
+
+    var nonce: [AES128GCM_NONCE_SIZE]u8
+    if(!HkdfSha256Expand(prk.buffer as (*const u8), 32, nonceInfo as (*const u8), nonceInfoLen, nonce as (*u8), AES128GCM_NONCE_SIZE)) {
+        return false
+    }
+
+    // Single record (RFC 8291 §4 forbids more than one): plaintext with
+    // the 0x02 "final record" padding delimiter appended, no further pad.
+    var paddedLen = payloadLen + 1
+    var padded = allocator.alloc(paddedLen as (usize)) as (*u8)
+    if(!padded) {
+        return false
+    }
+    defer allocator.free(padded as (*void))
+    memcpy(padded as (*void), payload as (*const void), payloadLen as (usize))
+    padded[payloadLen] = PADDING_DELIMITER
+
+    var ctAndTagLen = paddedLen + AES128GCM_TAG_SIZE
+    var ctAndTag = allocator.alloc(ctAndTagLen as (usize)) as (*u8)
+    if(!ctAndTag) {
+        return false
+    }
+    defer allocator.free(ctAndTag as (*void))
+
+    if(!AES128GCMEncrypt(cek as (*const u8), nonce as (*const u8), padded as (*const u8), paddedLen, null, 0, ctAndTag)) {
+        return false
+    }
+
+    // header = salt(16) || rs(4, big-endian) || idlen(1)=65 || keyid=as_public(65)
+    out.appendStrn(salt as (*const char), 16)
+
+    var rsBuf: [4]u8
+    rsBuf[0] = ((RECORD_SIZE >> 24) & 0xFF_u32) as (u8)
+    rsBuf[1] = ((RECORD_SIZE >> 16) & 0xFF_u32) as (u8)
+    rsBuf[2] = ((RECORD_SIZE >> 8)  & 0xFF_u32) as (u8)
+    rsBuf[3] = (RECORD_SIZE & 0xFF_u32) as (u8)
+    out.appendStrn(rsBuf as (*const char), 4)
+
+    var idLen: u8 = EC_P256_PUBLIC_KEY_SIZE as (u8)
+    out.appendStrn((&idLen) as (*const char), 1)
+    out.appendStrn(asPublicBytes as (*const char), EC_P256_PUBLIC_KEY_SIZE)
+
+    out.appendStrn(ctAndTag as (*const char), ctAndTagLen)
+    return true
+}
+
+// Sends a Web Push message: encrypts payload (RFC 8291), signs a VAPID
+// JWT (RFC 8292) for the subscription's origin, and POSTs. Generates a
+// fresh ephemeral EC keypair and random salt for every call — never reuse
+// either across messages.
+public func SendWebPush(
+    subscription: *PushSubscription,
+    vapid: *VapidConfig,
+    payload: String,
+    ttlSeconds: i32,
+    http: *Http,
+    allocator: *const Allocator
+) : PushResult {
+    var asPair: EcKeyPair
+    if(!EcGenerateKeyPair(&asPair)) {
+        return PushResult { .status = PushStatus.ERROR, .httpStatus = 0 }
+    }
+    defer asPair.free()
+
+    var salt: [16]u8
+    var r1 = SecureRandom64()
+    var r2 = SecureRandom64()
+    memcpy(salt as (*void), (&r1) as (*const void), 8_usize)
+    memcpy((&salt[8]) as (*void), (&r2) as (*const void), 8_usize)
+
+    var body = StringBuilderInit(HEADER_SIZE + payload.length + 32, allocator)
+    defer body.free()
+    if(!encryptPayload(subscription, &asPair, salt as (*const u8), payload.buffer as (*const u8), payload.length, allocator, &body)) {
+        return PushResult { .status = PushStatus.ERROR, .httpStatus = 0 }
+    }
+
+    var origin = StringBuilderInit(128, allocator)
+    defer origin.free()
+    if(!extractOrigin(subscription.endpoint, &origin)) {
+        return PushResult { .status = PushStatus.ERROR, .httpStatus = 0 }
+    }
+
+    var jwt = buildVapidJwt(vapid, origin.toString(), allocator)
+    defer if(jwt.buffer) { allocator.free(jwt.buffer as (*void)) }
+    if(jwt.empty()) {
+        return PushResult { .status = PushStatus.ERROR, .httpStatus = 0 }
+    }
+
+    var authHeader = StringBuilderInit(32 + jwt.length + vapid.publicKey.length, allocator)
+    defer authHeader.free()
+    authHeader.append("vapid t=%.*s, k=%.*s", jwt.length, jwt.buffer, vapid.publicKey.length, vapid.publicKey.buffer)
+
+    var ttlBuf: [16]char
+    var ttlLen = snprintf(ttlBuf as (*char), 16, "%d", ttlSeconds)
+
+    var headers = HeadersInit(16, allocator)
+    defer headers.free()
+    headers.put($"Authorization", authHeader.toString())
+    headers.put($"Content-Encoding", $"aes128gcm")
+    headers.put($"TTL", String { .buffer = ttlBuf as (*const char), .length = ttlLen })
+
+    var resp = HttpResponse {
+        .body    = StringBuilderInit(256, allocator),
+        .headers = HeadersInit(16, allocator),
+    }
+    defer resp.body.free()
+    defer resp.headers.free()
+
+    var endpointBuf: [512]char
+    subscription.endpoint.copyTo(endpointBuf, 512)
+
+    http.post(endpointBuf as (*const char), &resp, body.toString(), &headers)
+
+    if(resp.statusCode == 404 || resp.statusCode == 410) {
+        return PushResult { .status = PushStatus.GONE, .httpStatus = resp.statusCode }
+    }
+    if(resp.statusCode < 200 || resp.statusCode >= 300) {
+        return PushResult { .status = PushStatus.ERROR, .httpStatus = resp.statusCode }
+    }
+    return PushResult { .status = PushStatus.OK, .httpStatus = resp.statusCode }
+}

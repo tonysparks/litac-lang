@@ -189,3 +189,144 @@ public func AES256GCMDecrypt(key: *const u8, encoded: *const u8, encodedLen: i32
     sb.appendStrn(plaintextBuf as (*const char), ptLen)
     return true
 }
+
+// ---------------------------------------------------------------------------
+// AES-128-GCM — lower-level than the AES-256 functions above: explicit
+// caller-supplied key AND nonce, no self-generated random nonce, no
+// base64/StringBuilder wrapper. Built for RFC 8188 ("aes128gcm" content
+// encoding, used by Web Push/RFC 8291): the nonce there is HKDF-derived,
+// not random, and belongs in an outer record header the caller controls —
+// this function has no business generating or placing it.
+// ---------------------------------------------------------------------------
+
+public const AES128GCM_KEY_SIZE:   i32 = 16
+public const AES128GCM_NONCE_SIZE: i32 = 12
+public const AES128GCM_TAG_SIZE:   i32 = 16
+
+const AES128GCM_MAX_PLAINTEXT_LEN: i32 = 64 * 1024 * 1024
+
+/*
+ * Encrypts plaintext with an explicit key + nonce (both caller-supplied —
+ * e.g. HKDF-derived). out must point to a buffer of at least
+ * plaintextLen + AES128GCM_TAG_SIZE bytes: ciphertext immediately followed
+ * by the 16-byte tag, no nonce prefix (unlike AES256GCMEncrypt's combined
+ * blob — the nonce isn't this function's to place). aad/aadLen may be
+ * null/0 for no associated data (Web Push uses none).
+ */
+public func AES128GCMEncrypt(
+    key: *const u8, nonce: *const u8,
+    plaintext: *const u8, plaintextLen: i32,
+    aad: *const u8, aadLen: i32,
+    out: *u8
+) : bool {
+    if(plaintextLen < 0 || plaintextLen > AES128GCM_MAX_PLAINTEXT_LEN) {
+        return false
+    }
+
+    var ctx = EVP_CIPHER_CTX_new()
+    if(!ctx) {
+        return false
+    }
+    defer EVP_CIPHER_CTX_free(ctx)
+
+    if(EVP_EncryptInit_ex(ctx, EVP_aes_128_gcm(), null, null, null) != 1) {
+        return false
+    }
+    if(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, AES128GCM_NONCE_SIZE, null) != 1) {
+        return false
+    }
+    if(EVP_EncryptInit_ex(ctx, null, null, key, nonce) != 1) {
+        return false
+    }
+
+    var len: i32 = 0
+    if(aadLen > 0) {
+        if(EVP_EncryptUpdate(ctx, null, &len, aad, aadLen) != 1) {
+            return false
+        }
+    }
+
+    var ctLen: i32 = 0
+    if(EVP_EncryptUpdate(ctx, out, &len, plaintext, plaintextLen) != 1) {
+        return false
+    }
+    ctLen = len
+
+    if(EVP_EncryptFinal_ex(ctx, &out[ctLen], &len) != 1) {
+        return false
+    }
+    ctLen += len
+
+    // GCM never expands ciphertext; guard against buffer overrun on tag write
+    if(ctLen > plaintextLen) {
+        return false
+    }
+
+    if(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, AES128GCM_TAG_SIZE, (&out[ctLen]) as (*void)) != 1) {
+        return false
+    }
+    return true
+}
+
+/*
+ * Decrypts ciphertext||tag (as produced by AES128GCMEncrypt) with an
+ * explicit key + nonce. out must point to a buffer of at least
+ * ciphertextAndTagLen - AES128GCM_TAG_SIZE bytes. Returns false on
+ * authentication failure or malformed input.
+ */
+public func AES128GCMDecrypt(
+    key: *const u8, nonce: *const u8,
+    ciphertextAndTag: *const u8, ciphertextAndTagLen: i32,
+    aad: *const u8, aadLen: i32,
+    out: *u8
+) : bool {
+    var ctLen = ciphertextAndTagLen - AES128GCM_TAG_SIZE
+    if(ctLen < 0 || ciphertextAndTagLen > AES128GCM_MAX_PLAINTEXT_LEN) {
+        return false
+    }
+
+    var ctBuf  = ciphertextAndTag
+    var tagBuf: *const u8 = &ciphertextAndTag[ctLen]
+
+    var ctx = EVP_CIPHER_CTX_new()
+    if(!ctx) {
+        return false
+    }
+    defer EVP_CIPHER_CTX_free(ctx)
+
+    if(EVP_DecryptInit_ex(ctx, EVP_aes_128_gcm(), null, null, null) != 1) {
+        return false
+    }
+    if(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, AES128GCM_NONCE_SIZE, null) != 1) {
+        return false
+    }
+    if(EVP_DecryptInit_ex(ctx, null, null, key, nonce) != 1) {
+        return false
+    }
+
+    var len: i32 = 0
+    if(aadLen > 0) {
+        if(EVP_DecryptUpdate(ctx, null, &len, aad, aadLen) != 1) {
+            return false
+        }
+    }
+
+    var ptLen: i32 = 0
+    if(EVP_DecryptUpdate(ctx, out, &len, ctBuf, ctLen) != 1) {
+        return false
+    }
+    ptLen = len
+
+    // Set expected tag before calling DecryptFinal — this is what triggers auth
+    if(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, AES128GCM_TAG_SIZE, tagBuf as (*void)) != 1) {
+        return false
+    }
+
+    // Returns <= 0 if tag verification fails
+    if(EVP_DecryptFinal_ex(ctx, &out[ptLen], &len) <= 0) {
+        return false
+    }
+    ptLen += len
+
+    return true
+}

@@ -1,0 +1,156 @@
+import "std/crypto/ec"
+import "std/assert"
+import "std/libc"
+
+@test
+func testGenerateKeyPairExportsCorrectSizes() {
+    var pair: EcKeyPair
+    assert(EcGenerateKeyPair(&pair))
+    defer pair.free()
+
+    var pub: [EC_P256_PUBLIC_KEY_SIZE]u8
+    assert(pair.exportPublicKey(pub as (*u8)))
+    // Uncompressed point always starts with 0x04.
+    assert(pub[0] == 0x04_u8)
+
+    var priv: [EC_P256_PRIVATE_KEY_SIZE]u8
+    assert(pair.exportPrivateKey(priv as (*u8)))
+}
+
+@test
+func testKeyPairRoundtripsThroughRawExportImport() {
+    var original: EcKeyPair
+    assert(EcGenerateKeyPair(&original))
+    defer original.free()
+
+    var pub: [EC_P256_PUBLIC_KEY_SIZE]u8
+    var priv: [EC_P256_PRIVATE_KEY_SIZE]u8
+    assert(original.exportPublicKey(pub as (*u8)))
+    assert(original.exportPrivateKey(priv as (*u8)))
+
+    var reimported: EcKeyPair
+    assert(EcKeyPairFromRaw(priv as (*const u8), pub as (*const u8), &reimported))
+    defer reimported.free()
+
+    var reimportedPub: [EC_P256_PUBLIC_KEY_SIZE]u8
+    assert(reimported.exportPublicKey(reimportedPub as (*u8)))
+    assert(memcmp(pub as (*const void), reimportedPub as (*const void), EC_P256_PUBLIC_KEY_SIZE as (usize)) == 0)
+
+    var reimportedPriv: [EC_P256_PRIVATE_KEY_SIZE]u8
+    assert(reimported.exportPrivateKey(reimportedPriv as (*u8)))
+    assert(memcmp(priv as (*const void), reimportedPriv as (*const void), EC_P256_PRIVATE_KEY_SIZE as (usize)) == 0)
+}
+
+// The ECDH property this whole module exists for: both sides must derive
+// the identical shared secret from their own private key + the other's
+// public key.
+@test
+func testEcdhDeriveIsSymmetric() {
+    var alice: EcKeyPair
+    var bob: EcKeyPair
+    assert(EcGenerateKeyPair(&alice))
+    defer alice.free()
+    assert(EcGenerateKeyPair(&bob))
+    defer bob.free()
+
+    var alicePub: [EC_P256_PUBLIC_KEY_SIZE]u8
+    var bobPub: [EC_P256_PUBLIC_KEY_SIZE]u8
+    assert(alice.exportPublicKey(alicePub as (*u8)))
+    assert(bob.exportPublicKey(bobPub as (*u8)))
+
+    var bobPubOnly: EcKeyPair
+    assert(EcPublicKeyFromRaw(bobPub as (*const u8), &bobPubOnly))
+    defer bobPubOnly.free()
+
+    var alicePubOnly: EcKeyPair
+    assert(EcPublicKeyFromRaw(alicePub as (*const u8), &alicePubOnly))
+    defer alicePubOnly.free()
+
+    var secretFromAlice: [EC_P256_PRIVATE_KEY_SIZE]u8
+    var secretFromBob: [EC_P256_PRIVATE_KEY_SIZE]u8
+    assert(EcdhDerive(&alice, &bobPubOnly, secretFromAlice as (*u8)))
+    assert(EcdhDerive(&bob, &alicePubOnly, secretFromBob as (*u8)))
+
+    assert(memcmp(secretFromAlice as (*const void), secretFromBob as (*const void), EC_P256_PRIVATE_KEY_SIZE as (usize)) == 0)
+}
+
+@test
+func testEcdhDeriveDiffersForDifferentPeers() {
+    var alice: EcKeyPair
+    var bob: EcKeyPair
+    var carol: EcKeyPair
+    assert(EcGenerateKeyPair(&alice))
+    defer alice.free()
+    assert(EcGenerateKeyPair(&bob))
+    defer bob.free()
+    assert(EcGenerateKeyPair(&carol))
+    defer carol.free()
+
+    var bobPub: [EC_P256_PUBLIC_KEY_SIZE]u8
+    var carolPub: [EC_P256_PUBLIC_KEY_SIZE]u8
+    assert(bob.exportPublicKey(bobPub as (*u8)))
+    assert(carol.exportPublicKey(carolPub as (*u8)))
+
+    var bobPubOnly: EcKeyPair
+    var carolPubOnly: EcKeyPair
+    assert(EcPublicKeyFromRaw(bobPub as (*const u8), &bobPubOnly))
+    defer bobPubOnly.free()
+    assert(EcPublicKeyFromRaw(carolPub as (*const u8), &carolPubOnly))
+    defer carolPubOnly.free()
+
+    var secretWithBob: [EC_P256_PRIVATE_KEY_SIZE]u8
+    var secretWithCarol: [EC_P256_PRIVATE_KEY_SIZE]u8
+    assert(EcdhDerive(&alice, &bobPubOnly, secretWithBob as (*u8)))
+    assert(EcdhDerive(&alice, &carolPubOnly, secretWithCarol as (*u8)))
+
+    assert(memcmp(secretWithBob as (*const void), secretWithCarol as (*const void), EC_P256_PRIVATE_KEY_SIZE as (usize)) != 0)
+}
+
+@test
+func testEcdsaSignAndVerifyRoundtrip() {
+    var pair: EcKeyPair
+    assert(EcGenerateKeyPair(&pair))
+    defer pair.free()
+
+    var msg = "the quick brown fox jumps over the lazy dog"
+    var msgLen = strlen(msg) as (i32)
+
+    var sig: [ECDSA_P1363_SIGNATURE_SIZE]u8
+    assert(EcdsaSignP1363(&pair, msg as (*const u8), msgLen, sig as (*u8)))
+
+    assert(EcdsaVerifyP1363(&pair, msg as (*const u8), msgLen, sig as (*const u8)))
+}
+
+@test
+func testEcdsaVerifyRejectsTamperedMessage() {
+    var pair: EcKeyPair
+    assert(EcGenerateKeyPair(&pair))
+    defer pair.free()
+
+    var msg = "the quick brown fox jumps over the lazy dog"
+    var msgLen = strlen(msg) as (i32)
+
+    var sig: [ECDSA_P1363_SIGNATURE_SIZE]u8
+    assert(EcdsaSignP1363(&pair, msg as (*const u8), msgLen, sig as (*u8)))
+
+    var tampered = "the quick brown fox jumps over the lazy dot"
+    assert(!EcdsaVerifyP1363(&pair, tampered as (*const u8), msgLen, sig as (*const u8)))
+}
+
+@test
+func testEcdsaVerifyRejectsWrongKey() {
+    var signer: EcKeyPair
+    var other: EcKeyPair
+    assert(EcGenerateKeyPair(&signer))
+    defer signer.free()
+    assert(EcGenerateKeyPair(&other))
+    defer other.free()
+
+    var msg = "the quick brown fox jumps over the lazy dog"
+    var msgLen = strlen(msg) as (i32)
+
+    var sig: [ECDSA_P1363_SIGNATURE_SIZE]u8
+    assert(EcdsaSignP1363(&signer, msg as (*const u8), msgLen, sig as (*u8)))
+
+    assert(!EcdsaVerifyP1363(&other, msg as (*const u8), msgLen, sig as (*const u8)))
+}

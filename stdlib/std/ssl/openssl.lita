@@ -249,6 +249,9 @@ public func EVP_CIPHER_CTX_free(ctx: *EVP_CIPHER_CTX);
 @foreign
 public func EVP_aes_256_gcm() : *const EVP_CIPHER;
 
+@foreign
+public func EVP_aes_128_gcm() : *const EVP_CIPHER;
+
 // Pass type=null on second call to reuse cipher without reinit.
 // Pass key=null, iv=null on first call to set cipher before key/iv.
 @foreign
@@ -320,4 +323,142 @@ public func EVP_DigestFinal_ex(ctx: *EVP_MD_CTX, md: *u8, size: *u32) : i32;
 @foreign
 public func HMAC(evp_md: *const EVP_MD, key: *const void, key_len: i32,
                   d: *const u8, n: usize, md: *u8, md_len: *u32) : *u8;
+
+// ---------------------------------------------------------------------------
+// EC (P-256) keys, ECDH, ECDSA — used by std/crypto/ec (Web Push: VAPID
+// signing, subscription-key ECDH). Built on the legacy EC_KEY API rather
+// than the OpenSSL 3.0 OSSL_PARAM builder API: EC_KEY_* is marked
+// OSSL_DEPRECATEDIN_3_0 (generates a deprecation warning, still fully
+// functional — OpenSSL has not announced a removal version) but is a much
+// smaller binding surface for the same result. EVP_PKEY wraps an EC_KEY for
+// operations (derive, sign) that require the modern API.
+// ---------------------------------------------------------------------------
+
+@foreign
+public struct EVP_PKEY {}
+
+@foreign
+public struct EVP_PKEY_CTX {}
+
+@foreign
+public struct EC_KEY {}
+
+@foreign
+public struct BIGNUM {}
+
+@foreign
+public struct ECDSA_SIG {}
+
+// NID_X9_62_prime256v1 — the P-256 curve. Stable across OpenSSL versions.
+public const NID_X9_62_PRIME256V1: i32 = 415
+
+@foreign
+public func EC_KEY_new_by_curve_name(nid: i32) : *EC_KEY;
+
+@foreign
+public func EC_KEY_generate_key(key: *EC_KEY) : i32;
+
+@foreign
+public func EC_KEY_free(key: *EC_KEY);
+
+@foreign
+public func EC_KEY_get0_private_key(key: *const EC_KEY) : *const BIGNUM;
+
+@foreign
+public func EC_KEY_set_private_key(key: *EC_KEY, prv: *const BIGNUM) : i32;
+
+// Imports an uncompressed EC point (0x04 || X || Y) as *key's public point.
+// *key must already have its curve set (e.g. via EC_KEY_new_by_curve_name).
+// Advances *in_ by len, per OpenSSL's o2i/d2i convention.
+@foreign
+public func o2i_ECPublicKey(key: **EC_KEY, in_: **const u8, len: i64) : *EC_KEY;
+
+// Exports the public point in uncompressed form (65 bytes for P-256).
+// *out must point to a pre-allocated buffer; pass its address — does NOT
+// allocate on our behalf (that mode is only when *out itself is null).
+@foreign
+public func i2o_ECPublicKey(key: *const EC_KEY, out: **u8) : i32;
+
+@foreign
+public func EVP_PKEY_new() : *EVP_PKEY;
+
+@foreign
+public func EVP_PKEY_free(pkey: *EVP_PKEY);
+
+@foreign
+public func EVP_PKEY_set1_EC_KEY(pkey: *EVP_PKEY, key: *EC_KEY) : i32;
+
+@foreign
+public func EVP_PKEY_CTX_new(pkey: *EVP_PKEY, e: *void) : *EVP_PKEY_CTX;
+
+@foreign
+public func EVP_PKEY_CTX_free(ctx: *EVP_PKEY_CTX);
+
+// ECDH shared-secret derivation.
+@foreign
+public func EVP_PKEY_derive_init(ctx: *EVP_PKEY_CTX) : i32;
+
+@foreign
+public func EVP_PKEY_derive_set_peer(ctx: *EVP_PKEY_CTX, peer: *EVP_PKEY) : i32;
+
+// Pass key=null to query the required buffer length into *keylen first.
+@foreign
+public func EVP_PKEY_derive(ctx: *EVP_PKEY_CTX, key: *u8, keylen: *usize) : i32;
+
+// One-shot ECDSA signing (ES256 = this + EVP_sha256()). Produces a
+// DER-encoded SEQUENCE{r,s} — see ECDSA_SIG_get0 below to convert to the
+// raw r||s form JOSE/JWS actually requires.
+@foreign
+public func EVP_DigestSignInit(ctx: *EVP_MD_CTX, pctx: **EVP_PKEY_CTX,
+                                type_: *const EVP_MD, e: *void, pkey: *EVP_PKEY) : i32;
+
+// Pass sigret=null to query the required buffer length into *siglen first.
+@foreign
+public func EVP_DigestSign(ctx: *EVP_MD_CTX, sigret: *u8, siglen: *usize,
+                            tbs: *const u8, tbslen: usize) : i32;
+
+// BIGNUM — used to extract/inject fixed-width big-endian scalars (EC
+// private keys, ECDSA r/s components).
+@foreign
+public func BN_bin2bn(s: *const u8, len: i32, ret: *BIGNUM) : *BIGNUM;
+
+// Writes exactly tolen bytes, big-endian, zero-padded on the left.
+@foreign
+public func BN_bn2binpad(a: *const BIGNUM, to: *u8, tolen: i32) : i32;
+
+@foreign
+public func BN_free(a: *BIGNUM);
+
+// Parses the DER SEQUENCE{r,s} that EVP_DigestSign produces, so r/s can be
+// re-emitted as the fixed 32-byte-each raw concatenation JWS ES256 needs.
+@foreign
+public func d2i_ECDSA_SIG(sig: **ECDSA_SIG, pp: **const u8, len: i64) : *ECDSA_SIG;
+
+@foreign
+public func ECDSA_SIG_get0(sig: *const ECDSA_SIG, pr: **const BIGNUM, ps: **const BIGNUM);
+
+@foreign
+public func ECDSA_SIG_free(sig: *ECDSA_SIG);
+
+@foreign
+public func ECDSA_SIG_new() : *ECDSA_SIG;
+
+// Takes ownership of r and s (do not BN_free them separately afterward).
+@foreign
+public func ECDSA_SIG_set0(sig: *ECDSA_SIG, r: *BIGNUM, s: *BIGNUM) : i32;
+
+// Re-encodes an ECDSA_SIG back to DER — the inverse of d2i_ECDSA_SIG, used
+// to verify a raw r||s (P1363-format) signature via EVP_DigestVerify, which
+// only accepts the DER form.
+@foreign
+public func i2d_ECDSA_SIG(sig: *const ECDSA_SIG, pp: **u8) : i32;
+
+@foreign
+public func EVP_DigestVerifyInit(ctx: *EVP_MD_CTX, pctx: **EVP_PKEY_CTX,
+                                  type_: *const EVP_MD, e: *void, pkey: *EVP_PKEY) : i32;
+
+// Returns 1 if the signature is valid, 0 if invalid, <0 on error.
+@foreign
+public func EVP_DigestVerify(ctx: *EVP_MD_CTX, sigret: *const u8, siglen: usize,
+                              tbs: *const u8, tbslen: usize) : i32;
 

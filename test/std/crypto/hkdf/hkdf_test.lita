@@ -1,0 +1,87 @@
+import "std/crypto/hkdf"
+import "std/crypto/sha256"
+import "std/encoding/hex"
+import "std/string"
+import "std/assert"
+import "std/libc"
+
+// RFC 5869 §A.1 Test Case 1 (basic, SHA-256).
+@test
+func testRfc5869TestCase1() {
+    var ikm: [22]u8
+    assert(HexDecode($"0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b", ikm as (*u8)))
+
+    var salt: [13]u8
+    assert(HexDecode($"000102030405060708090a0b0c", salt as (*u8)))
+
+    var info: [10]u8
+    assert(HexDecode($"f0f1f2f3f4f5f6f7f8f9", info as (*u8)))
+
+    var expectedPrk: [32]u8
+    assert(HexDecode($"077709362c2e32df0ddc3f0dc47bba6390b6c73bb50f9c3122ec844ad7c2b3e5", expectedPrk as (*u8)))
+
+    var expectedOkm: [42]u8
+    assert(HexDecode($"3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf34007208d5b887185865", expectedOkm as (*u8)))
+
+    var prk: Sha256Buf
+    assert(HkdfSha256Extract(salt as (*const u8), 13, ikm as (*const u8), 22, &prk))
+    assert(memcmp(prk.buffer as (*const void), expectedPrk as (*const void), 32_usize) == 0)
+
+    var okm: [42]u8
+    assert(HkdfSha256Expand(prk.buffer as (*const u8), 32, info as (*const u8), 10, okm as (*u8), 42))
+    assert(memcmp(okm as (*const void), expectedOkm as (*const void), 42_usize) == 0)
+}
+
+// RFC 5869 §A.3 Test Case 3 — zero-length salt and info, the edge case
+// most likely to break a naive implementation (empty-key HMAC, zero-length
+// memcpy of info).
+@test
+func testRfc5869TestCase3ZeroLengthSaltAndInfo() {
+    var ikm: [22]u8
+    assert(HexDecode($"0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b", ikm as (*u8)))
+
+    var expectedPrk: [32]u8
+    assert(HexDecode($"19ef24a32c717b167f33a91d6f648bdf96596776afdb6377ac434c1c293ccb04", expectedPrk as (*u8)))
+
+    var expectedOkm: [42]u8
+    assert(HexDecode($"8da4e775a563c18f715f802a063c5a31b8a11f5c5ee1879ec3454e5f3c738d2d9d201395faa4b61a96c8", expectedOkm as (*u8)))
+
+    var prk: Sha256Buf
+    assert(HkdfSha256Extract(null, 0, ikm as (*const u8), 22, &prk))
+    assert(memcmp(prk.buffer as (*const void), expectedPrk as (*const void), 32_usize) == 0)
+
+    var okm: [42]u8
+    assert(HkdfSha256Expand(prk.buffer as (*const u8), 32, null, 0, okm as (*u8), 42))
+    assert(memcmp(okm as (*const void), expectedOkm as (*const void), 42_usize) == 0)
+}
+
+// Output length exactly one HMAC block (32 bytes) — no counter-looping
+// beyond the first round. Same PRK/info as Test Case 1, first 32 bytes of
+// its expected OKM (HKDF-Expand is a deterministic prefix stream: L=32
+// must equal the first 32 bytes of the L=42 output above).
+@test
+func testExpandExactSingleBlock() {
+    var salt: [13]u8
+    assert(HexDecode($"000102030405060708090a0b0c", salt as (*u8)))
+    var ikm: [22]u8
+    assert(HexDecode($"0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b", ikm as (*u8)))
+    var info: [10]u8
+    assert(HexDecode($"f0f1f2f3f4f5f6f7f8f9", info as (*u8)))
+
+    var expectedOkm32: [32]u8
+    assert(HexDecode($"3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf", expectedOkm32 as (*u8)))
+
+    var prk: Sha256Buf
+    assert(HkdfSha256Extract(salt as (*const u8), 13, ikm as (*const u8), 22, &prk))
+
+    var okm: [32]u8
+    assert(HkdfSha256Expand(prk.buffer as (*const u8), 32, info as (*const u8), 10, okm as (*u8), 32))
+    assert(memcmp(okm as (*const void), expectedOkm32 as (*const void), 32_usize) == 0)
+}
+
+@test
+func testExpandRejectsOutputTooLarge() {
+    var prk: [32]u8
+    var out: [1]u8
+    assert(!HkdfSha256Expand(prk as (*const u8), 32, null, 0, out as (*u8), HKDF_SHA256_MAX_OUTPUT + 1))
+}

@@ -1,0 +1,136 @@
+import "std/webpush"
+import "std/crypto/ec"
+import "std/encoding/hex"
+import "std/encoding/base64url"
+import "std/string"
+import "std/string/builder"
+import "std/string/buffer"
+import "std/assert"
+import "std/libc"
+import "std/mem"
+
+// RFC 8291 Appendix A's full worked example ("A Worked Example"), fetched
+// verbatim from https://www.rfc-editor.org/rfc/rfc8291.txt (not
+// transcribed from memory) and independently decoded from base64url to
+// hex. This is the strongest possible correctness proof for the
+// ECDH+HKDF+AES128GCM pipeline: an external, standards-body-published
+// vector with known inputs and a known expected output, not just
+// self-consistency.
+@test
+func testRfc8291AppendixAWorkedExample() {
+    var asPrivate: [32]u8
+    assert(HexDecode($"c9f58f89813e9f8e872e71f42aa64e1757c9254dcc62b72ddc010bb4043ea11c", asPrivate as (*u8)))
+    var asPublic: [65]u8
+    assert(HexDecode($"04fe33f4ab0dea71914db55823f73b54948f41306d920732dbb9a59a53286482200e597a7b7bc260ba1c227998580992e93973002f3012a28ae8f06bbb78e5ec0f", asPublic as (*u8)))
+    var salt: [16]u8
+    assert(HexDecode($"0c6bfaadad67958803092d454676f397", salt as (*u8)))
+
+    var expectedBody: [144]u8
+    assert(HexDecode($"0c6bfaadad67958803092d454676f397000010004104fe33f4ab0dea71914db55823f73b54948f41306d920732dbb9a59a53286482200e597a7b7bc260ba1c227998580992e93973002f3012a28ae8f06bbb78e5ec0ff297de5b429bba7153d3a4ae0caa091fd425f3b4b5414add8ab37a19c1bbb05cf5cb5b2a2e0562d558635641ec52812c6c8ff42e95ccb86be7cd", expectedBody as (*u8)))
+
+    var asPair: EcKeyPair
+    assert(EcKeyPairFromRaw(asPrivate as (*const u8), asPublic as (*const u8), &asPair))
+    defer asPair.free()
+
+    // The RFC's own base64url strings, used directly — these are exactly
+    // what a real PushSubscription's p256dh/auth fields look like.
+    var subscription = PushSubscription {
+        .endpoint = $"https://push.example.net/push/JzLQ3raZJfFBR0aqvOMsLrt54w4rJUsV",
+        .p256dh   = $"BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4",
+        .auth     = $"BTBZMqHH6r4Tts7J_aSIgg",
+    }
+
+    var plaintext = "When I grow up, I want to be a watermelon"
+    var plaintextLen = strlen(plaintext) as (i32)
+    assert(plaintextLen == 41)
+
+    var body = StringBuilderInit(256, defaultAllocator)
+    defer body.free()
+
+    assert(encryptPayload(
+        &subscription, &asPair, salt as (*const u8),
+        plaintext as (*const u8), plaintextLen,
+        defaultAllocator, &body
+    ))
+
+    assert(body.length == 144)
+    assert(memcmp(body.buffer as (*const void), expectedBody as (*const void), 144_usize) == 0)
+}
+
+@test
+func testExtractOriginStripsPath() {
+    var out = StringBuilderInit(64, defaultAllocator)
+    defer out.free()
+    assert(extractOrigin($"https://fcm.googleapis.com/fcm/send/abc123", &out))
+    assert(out.toString().equals($"https://fcm.googleapis.com"))
+}
+
+@test
+func testExtractOriginNoPath() {
+    var out = StringBuilderInit(64, defaultAllocator)
+    defer out.free()
+    assert(extractOrigin($"https://push.example.net", &out))
+    assert(out.toString().equals($"https://push.example.net"))
+}
+
+@test
+func testExtractOriginRejectsMalformedUrl() {
+    var out = StringBuilderInit(64, defaultAllocator)
+    defer out.free()
+    assert(!extractOrigin($"not-a-url", &out))
+}
+
+// buildVapidJwt has no external test vector (RFC 8292 doesn't publish
+// one), so this verifies it the standard way for signing code: build a
+// JWT, split it apart, and check the signature verifies against the same
+// key via the independently-tested EcdsaVerifyP1363 — proves signing and
+// the exact bytes being signed (header.claims) are self-consistent.
+@test
+func testVapidJwtSignatureVerifies() {
+    var privBytes: [32]u8
+    var pubBytes: [65]u8
+    var genPair: EcKeyPair
+    assert(EcGenerateKeyPair(&genPair))
+    assert(genPair.exportPrivateKey(privBytes as (*u8)))
+    assert(genPair.exportPublicKey(pubBytes as (*u8)))
+    genPair.free()
+
+    var privB64: [64]char
+    var privB64Len = Base64UrlEncode(privBytes as (*const u8), 32, privB64 as (*char))
+    var pubB64: [128]char
+    var pubB64Len = Base64UrlEncode(pubBytes as (*const u8), 65, pubB64 as (*char))
+
+    var vapid = VapidConfig {
+        .publicKey  = String { .buffer = pubB64 as (*const char), .length = pubB64Len },
+        .privateKey = String { .buffer = privB64 as (*const char), .length = privB64Len },
+        .subject    = $"mailto:ops@example.com",
+    }
+
+    var jwt = buildVapidJwt(&vapid, $"https://push.example.net", defaultAllocator)
+    defer allocator_free(jwt)
+    assert(!jwt.empty())
+
+    var firstDot = jwt.indexOf($".")
+    assert(firstDot > 0)
+    var secondDotRel = jwt.substring(firstDot + 1).indexOf($".")
+    assert(secondDotRel > 0)
+    var secondDot = firstDot + 1 + secondDotRel
+
+    var signingInput = jwt.substring(0, secondDot)
+    var sigB64 = jwt.substring(secondDot + 1)
+
+    var sigBytes: [64]u8
+    assert(Base64UrlDecode(sigB64, sigBytes as (*u8)) == 64)
+
+    var pair: EcKeyPair
+    assert(EcKeyPairFromRaw(privBytes as (*const u8), pubBytes as (*const u8), &pair))
+    defer pair.free()
+
+    assert(EcdsaVerifyP1363(&pair, signingInput.buffer as (*const u8), signingInput.length, sigBytes as (*const u8)))
+}
+
+func allocator_free(s: String) {
+    if(s.buffer) {
+        defaultAllocator.free(s.buffer as (*void))
+    }
+}

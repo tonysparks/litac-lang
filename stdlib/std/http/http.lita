@@ -243,6 +243,14 @@ public func (this: *Http) makeRequest(req: *HttpRequest, resp: *HttpResponse) : 
     curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_NOPROGRESS, 1_i64);
     curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_FOLLOWLOCATION, 1_i64);
     curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_MAXREDIRS, 8_i64);
+    // Restricts both the initial request AND anything FOLLOWLOCATION redirects
+    // to — without CURLOPT_REDIR_PROTOCOLS specifically, an http(s) URL could
+    // still redirect to file://, gopher://, etc. Defense-in-depth: any caller
+    // passing a URL sourced from user input (e.g. a webhook or subscription
+    // endpoint) is one unvalidated field away from SSRF/protocol smuggling
+    // otherwise.
+    curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
+    curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_REDIR_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
     curl_easy_setopt<bool>(curl, CURLoption.CURLOPT_SSL_VERIFYPEER, this.options.verifySsl);
     curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_SSL_VERIFYHOST, this.options.verifySsl ? 2_i64 : 0_i64);
     if(this.options.caPath) {

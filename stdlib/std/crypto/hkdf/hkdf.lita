@@ -1,0 +1,70 @@
+import "std/crypto/hmac"
+import "std/crypto/sha256"
+import "std/string"
+import "std/libc"
+
+// HKDF (RFC 5869), built directly on the existing HmacSha256 — Extract is
+// one HMAC call, Expand is HMAC applied iteratively. Needed for Web Push's
+// aes128gcm key derivation (RFC 8188/8291), which chains two separate HKDF
+// stages.
+
+public const HKDF_SHA256_MAX_OUTPUT: i32 = 255 * 32 // RFC 5869 §2.3 hard limit: 255 * hash length
+
+// `info` inputs used by Web Push are all small fixed strings (longest is
+// RFC 8291's key_info: "WebPush: info" || 0x00 || two 65-byte EC points =
+// 144 bytes) — this bound is generous, not tight.
+const MAX_INFO_LEN: i32 = 256
+
+// HKDF-Extract: PRK = HMAC-SHA256(salt, ikm). out must be 32 bytes (SHA-256
+// digest size) — same shape as HmacSha256's own output, reused as-is.
+public func HkdfSha256Extract(salt: *const u8, saltLen: i32, ikm: *const u8, ikmLen: i32, out: *Sha256Buf) : bool {
+    var saltStr = String { .buffer = salt as (*const char), .length = saltLen }
+    var ikmStr  = String { .buffer = ikm as (*const char), .length = ikmLen }
+    return HmacSha256(saltStr, ikmStr, out)
+}
+
+// HKDF-Expand: derives outLen bytes from prk + info. out must point to a
+// buffer of at least outLen bytes; outLen must be <= HKDF_SHA256_MAX_OUTPUT
+// and infoLen <= MAX_INFO_LEN.
+public func HkdfSha256Expand(prk: *const u8, prkLen: i32, info: *const u8, infoLen: i32, out: *u8, outLen: i32) : bool {
+    if(outLen < 0 || outLen > HKDF_SHA256_MAX_OUTPUT) {
+        return false
+    }
+    if(infoLen < 0 || infoLen > MAX_INFO_LEN) {
+        return false
+    }
+
+    var prkStr = String { .buffer = prk as (*const char), .length = prkLen }
+
+    var prev: [32]u8      // T(i-1); unused (prevLen=0) for the first round
+    var prevLen = 0
+    var counter: u8 = 1_u8
+    var written = 0
+
+    while(written < outLen) {
+        // T(i) = HMAC-SHA256(PRK, T(i-1) || info || counter)
+        var msgBuf: [32 + MAX_INFO_LEN + 1]u8
+        memcpy(msgBuf as (*void), prev as (*const void), prevLen as (usize))
+        memcpy((&msgBuf[prevLen]) as (*void), info as (*const void), infoLen as (usize))
+        msgBuf[prevLen + infoLen] = counter
+        var msgLen = prevLen + infoLen + 1
+
+        var msgStr = String { .buffer = msgBuf as (*const char), .length = msgLen }
+        var t: Sha256Buf
+        if(!HmacSha256(prkStr, msgStr, &t)) {
+            return false
+        }
+
+        var chunk = outLen - written
+        if(chunk > 32) {
+            chunk = 32
+        }
+        memcpy((&out[written]) as (*void), t.buffer as (*const void), chunk as (usize))
+
+        memcpy(prev as (*void), t.buffer as (*const void), 32_usize)
+        prevLen = 32
+        written += chunk
+        counter += 1_u8
+    }
+    return true
+}

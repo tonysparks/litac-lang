@@ -1,0 +1,157 @@
+import "std/crypto/aes"
+import "std/encoding/hex"
+import "std/string"
+import "std/assert"
+import "std/libc"
+
+// Ground-truth vector generated directly against the same OpenSSL EVP
+// AES-128-GCM this binding calls into (key=0x00..0x0f, nonce=0x10..0x1b,
+// aad="aad12", plaintext="hello web push") — not a hand-transcribed NIST
+// vector, to avoid transcription risk; verified independently via a
+// standalone C program linked against the same libcrypto.
+@test
+func testKnownAnswerVector() {
+    var key: [16]u8
+    assert(HexDecode($"000102030405060708090a0b0c0d0e0f", key as (*u8)))
+    var nonce: [12]u8
+    assert(HexDecode($"101112131415161718191a1b", nonce as (*u8)))
+    var aad: [5]u8
+    assert(HexDecode($"6161643132", aad as (*u8)))
+    var plaintext: [14]u8
+    assert(HexDecode($"68656c6c6f207765622070757368", plaintext as (*u8)))
+    var expectedCt: [14]u8
+    assert(HexDecode($"ac4b6fc3606fc18a75fd2d80b44f", expectedCt as (*u8)))
+    var expectedTag: [16]u8
+    assert(HexDecode($"aa5196211c76aa5d8f275301dd8c0e83", expectedTag as (*u8)))
+
+    var out: [30]u8
+    assert(AES128GCMEncrypt(
+        key as (*const u8), nonce as (*const u8),
+        plaintext as (*const u8), 14,
+        aad as (*const u8), 5,
+        out as (*u8)
+    ))
+
+    assert(memcmp(out as (*const void), expectedCt as (*const void), 14_usize) == 0)
+    assert(memcmp((&out[14]) as (*const void), expectedTag as (*const void), 16_usize) == 0)
+}
+
+@test
+func testEncryptDecryptRoundtripWithAad() {
+    var key: [16]u8
+    for(var i = 0; i < 16; i += 1) { key[i] = (i * 3 + 1) as (u8) }
+    var nonce: [12]u8
+    for(var i = 0; i < 12; i += 1) { nonce[i] = (i * 5 + 2) as (u8) }
+    var aad: [8]u8
+    for(var i = 0; i < 8; i += 1) { aad[i] = (i + 100) as (u8) }
+
+    var plaintext = "the eagle flies at midnight"
+    var ptLen = strlen(plaintext) as (i32)
+
+    var ctAndTag: [64]u8
+    assert(AES128GCMEncrypt(
+        key as (*const u8), nonce as (*const u8),
+        plaintext as (*const u8), ptLen,
+        aad as (*const u8), 8,
+        ctAndTag as (*u8)
+    ))
+
+    var decrypted: [64]u8
+    assert(AES128GCMDecrypt(
+        key as (*const u8), nonce as (*const u8),
+        ctAndTag as (*const u8), ptLen + AES128GCM_TAG_SIZE,
+        aad as (*const u8), 8,
+        decrypted as (*u8)
+    ))
+
+    assert(memcmp(decrypted as (*const void), plaintext as (*const void), ptLen as (usize)) == 0)
+}
+
+@test
+func testEncryptDecryptRoundtripNoAad() {
+    var key: [16]u8
+    for(var i = 0; i < 16; i += 1) { key[i] = (i * 7 + 3) as (u8) }
+    var nonce: [12]u8
+    for(var i = 0; i < 12; i += 1) { nonce[i] = (i * 11 + 4) as (u8) }
+
+    var plaintext = "no aad here"
+    var ptLen = strlen(plaintext) as (i32)
+
+    var ctAndTag: [64]u8
+    assert(AES128GCMEncrypt(
+        key as (*const u8), nonce as (*const u8),
+        plaintext as (*const u8), ptLen,
+        null, 0,
+        ctAndTag as (*u8)
+    ))
+
+    var decrypted: [64]u8
+    assert(AES128GCMDecrypt(
+        key as (*const u8), nonce as (*const u8),
+        ctAndTag as (*const u8), ptLen + AES128GCM_TAG_SIZE,
+        null, 0,
+        decrypted as (*u8)
+    ))
+
+    assert(memcmp(decrypted as (*const void), plaintext as (*const void), ptLen as (usize)) == 0)
+}
+
+@test
+func testDecryptFailsOnTamperedTag() {
+    var key: [16]u8
+    for(var i = 0; i < 16; i += 1) { key[i] = i as (u8) }
+    var nonce: [12]u8
+    for(var i = 0; i < 12; i += 1) { nonce[i] = (i + 50) as (u8) }
+
+    var plaintext = "sensitive"
+    var ptLen = strlen(plaintext) as (i32)
+
+    var ctAndTag: [64]u8
+    assert(AES128GCMEncrypt(
+        key as (*const u8), nonce as (*const u8),
+        plaintext as (*const u8), ptLen,
+        null, 0,
+        ctAndTag as (*u8)
+    ))
+
+    // Flip a bit in the tag.
+    ctAndTag[ptLen] = ctAndTag[ptLen] ^ 0xFF_u8
+
+    var decrypted: [64]u8
+    assert(!AES128GCMDecrypt(
+        key as (*const u8), nonce as (*const u8),
+        ctAndTag as (*const u8), ptLen + AES128GCM_TAG_SIZE,
+        null, 0,
+        decrypted as (*u8)
+    ))
+}
+
+@test
+func testDecryptFailsOnWrongAad() {
+    var key: [16]u8
+    for(var i = 0; i < 16; i += 1) { key[i] = i as (u8) }
+    var nonce: [12]u8
+    for(var i = 0; i < 12; i += 1) { nonce[i] = (i + 60) as (u8) }
+    var aad = "correct-aad"
+
+    var plaintext = "sensitive"
+    var ptLen = strlen(plaintext) as (i32)
+    var aadLen = strlen(aad) as (i32)
+
+    var ctAndTag: [64]u8
+    assert(AES128GCMEncrypt(
+        key as (*const u8), nonce as (*const u8),
+        plaintext as (*const u8), ptLen,
+        aad as (*const u8), aadLen,
+        ctAndTag as (*u8)
+    ))
+
+    var wrongAad = "wrong-aad!!"
+    var decrypted: [64]u8
+    assert(!AES128GCMDecrypt(
+        key as (*const u8), nonce as (*const u8),
+        ctAndTag as (*const u8), ptLen + AES128GCM_TAG_SIZE,
+        wrongAad as (*const u8), aadLen,
+        decrypted as (*u8)
+    ))
+}

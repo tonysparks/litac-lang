@@ -1,0 +1,256 @@
+import "std/ssl/openssl"
+
+// EC (P-256) key handling, ECDH, and ES256 (ECDSA-SHA256) signing — built
+// for Web Push (RFC 8291/8292): VAPID JWT signing and the ECDH step of
+// message encryption. Not a general-purpose EC library — P-256 only, and
+// only the operations Web Push actually needs.
+
+public const EC_P256_PRIVATE_KEY_SIZE: i32 = 32
+public const EC_P256_PUBLIC_KEY_SIZE:  i32 = 65 // uncompressed point: 0x04 || X(32) || Y(32)
+
+// Raw r||s concatenation (32 bytes each) — the JWS "P1363" signature format
+// ES256 requires, as opposed to OpenSSL's default DER SEQUENCE{r,s}.
+public const ECDSA_P1363_SIGNATURE_SIZE: i32 = 64
+
+public struct EcKeyPair {
+    pkey:  *EVP_PKEY // wraps eckey; used for EVP-level operations (derive, sign)
+    eckey: *EC_KEY   // kept alongside pkey — public-key export only works on this
+}
+
+func wrapEcKey(eckey: *EC_KEY, pair: *EcKeyPair) : bool {
+    var pkey = EVP_PKEY_new()
+    if(!pkey) {
+        EC_KEY_free(eckey)
+        return false
+    }
+    if(EVP_PKEY_set1_EC_KEY(pkey, eckey) != 1) {
+        EVP_PKEY_free(pkey)
+        EC_KEY_free(eckey)
+        return false
+    }
+
+    pair.pkey = pkey
+    pair.eckey = eckey
+    return true
+}
+
+// Generates a fresh P-256 keypair (both private and public). Used both for
+// one-time VAPID identity generation and for the per-message ephemeral
+// keypair RFC 8291 encryption requires.
+public func EcGenerateKeyPair(pair: *EcKeyPair) : bool {
+    var eckey = EC_KEY_new_by_curve_name(NID_X9_62_PRIME256V1)
+    if(!eckey) {
+        return false
+    }
+    if(EC_KEY_generate_key(eckey) != 1) {
+        EC_KEY_free(eckey)
+        return false
+    }
+    return wrapEcKey(eckey, pair)
+}
+
+// Reconstructs a full keypair from its raw serialized form: a
+// EC_P256_PRIVATE_KEY_SIZE-byte big-endian private scalar and the
+// EC_P256_PUBLIC_KEY_SIZE-byte uncompressed public point. Used to load a
+// persisted VAPID keypair (both halves stored separately in config) at
+// startup, rather than recomputing the public point from the private
+// scalar every time.
+public func EcKeyPairFromRaw(privateKey: *const u8, publicKey: *const u8, pair: *EcKeyPair) : bool {
+    var eckey = EC_KEY_new_by_curve_name(NID_X9_62_PRIME256V1)
+    if(!eckey) {
+        return false
+    }
+
+    var bn = BN_bin2bn(privateKey, EC_P256_PRIVATE_KEY_SIZE, null)
+    if(!bn) {
+        EC_KEY_free(eckey)
+        return false
+    }
+    var privOk = EC_KEY_set_private_key(eckey, bn) == 1
+    BN_free(bn)
+    if(!privOk) {
+        EC_KEY_free(eckey)
+        return false
+    }
+
+    var pubPtr = publicKey
+    if(!o2i_ECPublicKey(&eckey, &pubPtr, EC_P256_PUBLIC_KEY_SIZE as (i64))) {
+        EC_KEY_free(eckey)
+        return false
+    }
+
+    return wrapEcKey(eckey, pair)
+}
+
+// Imports only a public key — e.g. a browser's subscription p256dh point.
+// Not usable for signing (no private scalar); only as the peer side of
+// EcdhDerive.
+public func EcPublicKeyFromRaw(publicKey: *const u8, pair: *EcKeyPair) : bool {
+    var eckey = EC_KEY_new_by_curve_name(NID_X9_62_PRIME256V1)
+    if(!eckey) {
+        return false
+    }
+
+    var pubPtr = publicKey
+    if(!o2i_ECPublicKey(&eckey, &pubPtr, EC_P256_PUBLIC_KEY_SIZE as (i64))) {
+        EC_KEY_free(eckey)
+        return false
+    }
+
+    return wrapEcKey(eckey, pair)
+}
+
+public func (this: *EcKeyPair) free() {
+    if(this.pkey) {
+        EVP_PKEY_free(this.pkey)
+        this.pkey = null
+    }
+    if(this.eckey) {
+        EC_KEY_free(this.eckey)
+        this.eckey = null
+    }
+}
+
+// Exports the public key as an EC_P256_PUBLIC_KEY_SIZE-byte uncompressed
+// point (0x04 || X || Y). out must point to a buffer of at least that size.
+public func (this: *EcKeyPair) exportPublicKey(out: *u8) : bool {
+    var ptr = out
+    var n = i2o_ECPublicKey(this.eckey, &ptr)
+    return n == EC_P256_PUBLIC_KEY_SIZE
+}
+
+// Exports the private scalar as an EC_P256_PRIVATE_KEY_SIZE-byte big-endian
+// value. out must point to a buffer of at least that size.
+public func (this: *EcKeyPair) exportPrivateKey(out: *u8) : bool {
+    var bn = EC_KEY_get0_private_key(this.eckey)
+    if(!bn) {
+        return false
+    }
+    return BN_bn2binpad(bn, out, EC_P256_PRIVATE_KEY_SIZE) == EC_P256_PRIVATE_KEY_SIZE
+}
+
+// ECDH: derives the shared secret between a local (private) keypair and a
+// peer's public key. out must point to a buffer of at least
+// EC_P256_PRIVATE_KEY_SIZE bytes (P-256's shared secret is 32 bytes, the
+// curve's field size — same constant, different meaning).
+public func EcdhDerive(localPair: *EcKeyPair, peerPublic: *EcKeyPair, out: *u8) : bool {
+    var ctx = EVP_PKEY_CTX_new(localPair.pkey, null)
+    if(!ctx) {
+        return false
+    }
+    defer EVP_PKEY_CTX_free(ctx)
+
+    if(EVP_PKEY_derive_init(ctx) != 1) {
+        return false
+    }
+    if(EVP_PKEY_derive_set_peer(ctx, peerPublic.pkey) != 1) {
+        return false
+    }
+
+    var len = EC_P256_PRIVATE_KEY_SIZE as (usize)
+    if(EVP_PKEY_derive(ctx, out, &len) != 1) {
+        return false
+    }
+    return len == EC_P256_PRIVATE_KEY_SIZE as (usize)
+}
+
+// Max size of a DER-encoded ECDSA-Sig-Value for P-256 — each of r/s is at
+// most 33 bytes (leading zero for sign-bit padding) plus ASN.1 SEQUENCE/
+// INTEGER framing overhead; comfortably under 128.
+const MAX_DER_SIGNATURE_SIZE = 128
+
+// ES256 (ECDSA-SHA256) signing, producing the raw r||s concatenation JWS
+// requires — not OpenSSL's default DER SEQUENCE{r,s}. out must point to a
+// buffer of at least ECDSA_P1363_SIGNATURE_SIZE bytes.
+public func EcdsaSignP1363(pair: *EcKeyPair, data: *const u8, dataLen: i32, out: *u8) : bool {
+    var mdctx = EVP_MD_CTX_new()
+    if(!mdctx) {
+        return false
+    }
+    defer EVP_MD_CTX_free(mdctx)
+
+    if(EVP_DigestSignInit(mdctx, null, EVP_sha256(), null, pair.pkey) != 1) {
+        return false
+    }
+
+    var derLen: usize = 0_usize
+    if(EVP_DigestSign(mdctx, null, &derLen, data, dataLen as (usize)) != 1) {
+        return false
+    }
+    if(derLen as (i32) > MAX_DER_SIGNATURE_SIZE) {
+        return false
+    }
+
+    var derBuf: [MAX_DER_SIGNATURE_SIZE]u8
+    if(EVP_DigestSign(mdctx, derBuf as (*u8), &derLen, data, dataLen as (usize)) != 1) {
+        return false
+    }
+
+    var derPtr = derBuf as (*const u8)
+    var sig = d2i_ECDSA_SIG(null, &derPtr, derLen as (i64))
+    if(!sig) {
+        return false
+    }
+    defer ECDSA_SIG_free(sig)
+
+    var r: *const BIGNUM = null
+    var s: *const BIGNUM = null
+    ECDSA_SIG_get0(sig, &r, &s)
+
+    if(BN_bn2binpad(r, out, 32) != 32) {
+        return false
+    }
+    if(BN_bn2binpad(s, &out[32], 32) != 32) {
+        return false
+    }
+    return true
+}
+
+// Verifies an ES256 signature in raw r||s (P1363) format, the inverse of
+// EcdsaSignP1363. Round-trips back through DER internally since
+// EVP_DigestVerify only accepts that form.
+public func EcdsaVerifyP1363(pair: *EcKeyPair, data: *const u8, dataLen: i32, sig: *const u8) : bool {
+    var r = BN_bin2bn(sig, 32, null)
+    if(!r) {
+        return false
+    }
+    var s = BN_bin2bn(&sig[32], 32, null)
+    if(!s) {
+        BN_free(r)
+        return false
+    }
+
+    var ecdsaSig = ECDSA_SIG_new()
+    if(!ecdsaSig) {
+        BN_free(r)
+        BN_free(s)
+        return false
+    }
+    if(ECDSA_SIG_set0(ecdsaSig, r, s) != 1) {
+        BN_free(r)
+        BN_free(s)
+        ECDSA_SIG_free(ecdsaSig)
+        return false
+    }
+    // r/s ownership transferred to ecdsaSig on success — only it needs freeing now.
+    defer ECDSA_SIG_free(ecdsaSig)
+
+    var derBuf: [MAX_DER_SIGNATURE_SIZE]u8
+    var derPtr = derBuf as (*u8)
+    var derLen = i2d_ECDSA_SIG(ecdsaSig, &derPtr)
+    if(derLen <= 0 || derLen > MAX_DER_SIGNATURE_SIZE) {
+        return false
+    }
+
+    var mdctx = EVP_MD_CTX_new()
+    if(!mdctx) {
+        return false
+    }
+    defer EVP_MD_CTX_free(mdctx)
+
+    if(EVP_DigestVerifyInit(mdctx, null, EVP_sha256(), null, pair.pkey) != 1) {
+        return false
+    }
+
+    return EVP_DigestVerify(mdctx, derBuf as (*const u8), derLen as (usize), data, dataLen as (usize)) == 1
+}

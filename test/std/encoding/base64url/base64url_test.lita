@@ -1,0 +1,84 @@
+import "std/encoding/base64url"
+import "std/string"
+import "std/assert"
+import "std/libc"
+
+// 0xFB = 11111011 -> standard base64 "+w==" (first sextet 111110=62='+',
+// second sextet 110000=48='w', padded). base64url must map '+' -> '-' and
+// strip the padding entirely: "-w".
+@test
+func testEncodeMapsPlusAndStripsPadding() {
+    var data: [1]u8
+    data[0] = 0xFB_u8
+
+    var out: [8]char
+    var n = Base64UrlEncode(data as (*const u8), 1, out as (*char))
+
+    assert(n == 2)
+    assert(strncmp(out as (*const char), "-w", 2_usize) == 0)
+}
+
+// 0xFF 0xFF 0xFF -> standard base64 "////" (every sextet is 63='/'), no
+// padding needed for a length already a multiple of 3. base64url must map
+// every '/' -> '_'.
+@test
+func testEncodeMapsSlash() {
+    var data: [3]u8
+    data[0] = 0xFF_u8
+    data[1] = 0xFF_u8
+    data[2] = 0xFF_u8
+
+    var out: [8]char
+    var n = Base64UrlEncode(data as (*const u8), 3, out as (*char))
+
+    assert(n == 4)
+    assert(strncmp(out as (*const char), "____", 4_usize) == 0)
+}
+
+@test
+func testDecodeRestoresPaddingAndAlphabet() {
+    var decoded: [4]u8
+    var n = Base64UrlDecode($"-w", decoded as (*u8))
+
+    assert(n == 1)
+    assert(decoded[0] == 0xFB_u8)
+}
+
+@test
+func testRoundtripAcrossPaddingLengths() {
+    for(var len = 0; len <= 6; len += 1) {
+        var data: [6]u8
+        for(var i = 0; i < len; i += 1) {
+            data[i] = (i * 37 + 5) as (u8)
+        }
+
+        var encBuf: [16]char
+        var n = Base64UrlEncode(data as (*const u8), len, encBuf as (*char))
+
+        // No padding, no +/ ever present regardless of input.
+        for(var i = 0; i < n; i += 1) {
+            assert(encBuf[i] != '=')
+            assert(encBuf[i] != '+')
+            assert(encBuf[i] != '/')
+        }
+
+        var encStr = String { .buffer = encBuf as (*const char), .length = n }
+        var decBuf: [6]u8
+        var decLen = Base64UrlDecode(encStr, decBuf as (*u8))
+
+        assert(decLen == len)
+        assert(memcmp(data as (*const void), decBuf as (*const void), len as (usize)) == 0)
+    }
+}
+
+@test
+func testDecodeRejectsOversizedInput() {
+    var buf: [MAX_DECODE_INPUT + 4]char
+    for(var i = 0; i < MAX_DECODE_INPUT + 1; i += 1) {
+        buf[i] = 'A'
+    }
+    var tooLong = String { .buffer = buf as (*const char), .length = MAX_DECODE_INPUT + 1 }
+
+    var out: [MAX_DECODE_INPUT]u8
+    assert(Base64UrlDecode(tooLong, out as (*u8)) == -1)
+}
