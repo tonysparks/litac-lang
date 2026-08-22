@@ -260,7 +260,12 @@ func (this: *PackageManager) buildCommandArgs(
                 break;
             }
             default: {
-                programArgs.add(this.pkg.json.getStr("name", "a"))
+                if(options.isTest) {
+                    programArgs.add("test_build")
+                }
+                else {
+                    programArgs.add(this.pkg.json.getStr("name", "a"))
+                }
             }
         }
     }
