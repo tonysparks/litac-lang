@@ -1,0 +1,274 @@
+import "std/log/watcher"
+import "std/assert"
+import "std/string"
+import "std/system"
+import "std/libc"
+import "std/mem"
+import "std/log/watcher_test_helpers"
+
+// -----------------------------------------------------------------------
+// Test helpers
+// -----------------------------------------------------------------------
+
+const PATH_BUF_SIZE = 256
+
+// Writes {cwd}/test_output/log_watcher/{name} into the caller-owned `buf`
+// (creating the directory as a side effect) and returns a String view.
+func watcherTestPath(buf: *char, name: *const char) : String {
+    var dirBuf: [PATH_BUF_SIZE]char
+    snprintf(dirBuf, PATH_BUF_SIZE, "%s/test_output/log_watcher", CurrentWorkingPath())
+    Mkdirs(dirBuf)
+
+    var len = snprintf(buf, PATH_BUF_SIZE, "%s/test_output/log_watcher/%s", CurrentWorkingPath(), name)
+    return StringInit(buf, len)
+}
+
+func writeFile(path: String, content: *const char) {
+    var pathBuf: [PATH_BUF_SIZE]char
+    path.copyTo(pathBuf, PATH_BUF_SIZE)
+
+    var f = fopen(pathBuf, "wb")
+    assert(f != null)
+    fwrite(content, 1, strlen(content) as (usize), f)
+    fclose(f)
+}
+
+func appendFile(path: String, content: *const char) {
+    var pathBuf: [PATH_BUF_SIZE]char
+    path.copyTo(pathBuf, PATH_BUF_SIZE)
+
+    var f = fopen(pathBuf, "ab")
+    assert(f != null)
+    fwrite(content, 1, strlen(content) as (usize), f)
+    fclose(f)
+}
+
+// -----------------------------------------------------------------------
+// Routing: level match, event-attr match, non-matches excluded
+// -----------------------------------------------------------------------
+
+@test("LogWatcher dispatches a matching-level record and skips a non-matching one")
+func testLevelRouting() {
+    var logPathBuf: [PATH_BUF_SIZE]char
+    var offsetPathBuf: [PATH_BUF_SIZE]char
+    var logPath = watcherTestPath(logPathBuf, "level_routing.log")
+    var offsetPath = watcherTestPath(offsetPathBuf, "level_routing.offset")
+    remove(logPath.buffer)
+    remove(offsetPath.buffer)
+
+    var watcher: LogWatcher
+    watcher.init(logPath, offsetPath, defaultAllocator)
+
+    // Written after init(): a fresh watcher with no persisted offset yet
+    // starts from end-of-file, so content written before init() would be
+    // treated as pre-existing history and skipped (see
+    // testFirstRunSkipsExistingHistory) rather than dispatched.
+    writeFile(logPath,
+        "{\"level\":\"INFO\",\"time\":\"t1\",\"msg\":\"just info\"}\n{\"level\":\"ERROR\",\"time\":\"t2\",\"msg\":\"boom\"}\n"
+    )
+
+    var sink: RecordingSink
+    var sinkTrait: NotifySink = &sink
+    watcher.addRule($"ERROR", $"", sinkTrait)
+
+    watcher.pollOnce()
+
+    assert(sink.count == 1)
+    assert(strcmp(sink.levels[0], "ERROR") == 0)
+    assert(strcmp(sink.msgs[0], "boom") == 0)
+}
+
+@test("LogWatcher routes by the 'event' attr, not just level")
+func testEventAttrRouting() {
+    var logPathBuf: [PATH_BUF_SIZE]char
+    var offsetPathBuf: [PATH_BUF_SIZE]char
+    var logPath = watcherTestPath(logPathBuf, "event_routing.log")
+    var offsetPath = watcherTestPath(offsetPathBuf, "event_routing.offset")
+    remove(logPath.buffer)
+    remove(offsetPath.buffer)
+
+    var watcher: LogWatcher
+    watcher.init(logPath, offsetPath, defaultAllocator)
+
+    writeFile(logPath,
+        "{\"level\":\"INFO\",\"time\":\"t1\",\"msg\":\"new user\",\"attrs\":{\"event\":\"user_signup\",\"user_id\":\"42\"}}\n{\"level\":\"INFO\",\"time\":\"t2\",\"msg\":\"unrelated info\"}\n"
+    )
+
+    var sink: RecordingSink
+    watcher.addRule($"", $"user_signup", &sink)
+
+    watcher.pollOnce()
+
+    assert(sink.count == 1)
+    assert(strcmp(sink.msgs[0], "new user") == 0)
+    assert(sink.attrCounts[0] == 2)
+    var uid = sink.attrValue(0, "user_id")
+    assert(uid != null)
+    assert(strcmp(uid, "42") == 0)
+}
+
+// -----------------------------------------------------------------------
+// Offset tracking: no replay of already-processed lines, new lines picked
+// up on the next poll, restart resumes rather than replaying history.
+// -----------------------------------------------------------------------
+
+@test("LogWatcher does not re-dispatch lines already processed in a prior poll")
+func testNoReplayWithinSameWatcher() {
+    var logPathBuf: [PATH_BUF_SIZE]char
+    var offsetPathBuf: [PATH_BUF_SIZE]char
+    var logPath = watcherTestPath(logPathBuf, "no_replay.log")
+    var offsetPath = watcherTestPath(offsetPathBuf, "no_replay.offset")
+    remove(logPath.buffer)
+    remove(offsetPath.buffer)
+
+    var watcher: LogWatcher
+    watcher.init(logPath, offsetPath, defaultAllocator)
+
+    writeFile(logPath, "{\"level\":\"ERROR\",\"time\":\"t1\",\"msg\":\"first\"}\n")
+
+    var sink: RecordingSink
+    watcher.addRule($"ERROR", $"", &sink)
+
+    watcher.pollOnce()
+    assert(sink.count == 1)
+
+    // Poll again with nothing new appended — must not re-dispatch "first".
+    watcher.pollOnce()
+    assert(sink.count == 1)
+
+    appendFile(logPath, "{\"level\":\"ERROR\",\"time\":\"t2\",\"msg\":\"second\"}\n")
+    watcher.pollOnce()
+
+    assert(sink.count == 2)
+    assert(strcmp(sink.msgs[0], "first") == 0)
+    assert(strcmp(sink.msgs[1], "second") == 0)
+}
+
+@test("LogWatcher's first run skips pre-existing history instead of replaying it")
+func testFirstRunSkipsExistingHistory() {
+    var logPathBuf: [PATH_BUF_SIZE]char
+    var offsetPathBuf: [PATH_BUF_SIZE]char
+    var logPath = watcherTestPath(logPathBuf, "first_run.log")
+    var offsetPath = watcherTestPath(offsetPathBuf, "first_run.offset")
+    remove(logPath.buffer)
+    remove(offsetPath.buffer)
+
+    // Content already present before the watcher ever sees this file —
+    // simulates cardmng having been running for a while before the
+    // watcher is deployed alongside it.
+    writeFile(logPath, "{\"level\":\"ERROR\",\"time\":\"t0\",\"msg\":\"old-history-should-not-fire\"}\n")
+
+    var watcher: LogWatcher
+    watcher.init(logPath, offsetPath, defaultAllocator)
+
+    var sink: RecordingSink
+    watcher.addRule($"ERROR", $"", &sink)
+
+    watcher.pollOnce()
+    assert(sink.count == 0)
+
+    appendFile(logPath, "{\"level\":\"ERROR\",\"time\":\"t1\",\"msg\":\"fresh-should-fire\"}\n")
+    watcher.pollOnce()
+
+    assert(sink.count == 1)
+    assert(strcmp(sink.msgs[0], "fresh-should-fire") == 0)
+}
+
+@test("A fresh LogWatcher instance resumes from the persisted offset instead of replaying")
+func testResumesFromPersistedOffsetAcrossInstances() {
+    var logPathBuf: [PATH_BUF_SIZE]char
+    var offsetPathBuf: [PATH_BUF_SIZE]char
+    var logPath = watcherTestPath(logPathBuf, "resume.log")
+    var offsetPath = watcherTestPath(offsetPathBuf, "resume.offset")
+    remove(logPath.buffer)
+    remove(offsetPath.buffer)
+
+    var watcherA: LogWatcher
+    watcherA.init(logPath, offsetPath, defaultAllocator)
+
+    writeFile(logPath, "{\"level\":\"ERROR\",\"time\":\"t1\",\"msg\":\"before-restart\"}\n")
+
+    var sinkA: RecordingSink
+    watcherA.addRule($"ERROR", $"", &sinkA)
+    watcherA.pollOnce()
+    assert(sinkA.count == 1)
+
+    appendFile(logPath, "{\"level\":\"ERROR\",\"time\":\"t2\",\"msg\":\"after-restart\"}\n")
+
+    // A brand new watcher instance, same offset state file — simulates
+    // the tailer process restarting.
+    var watcherB: LogWatcher
+    watcherB.init(logPath, offsetPath, defaultAllocator)
+    var sinkB: RecordingSink
+    watcherB.addRule($"ERROR", $"", &sinkB)
+    watcherB.pollOnce()
+
+    assert(sinkB.count == 1)
+    assert(strcmp(sinkB.msgs[0], "after-restart") == 0)
+}
+
+@test("A one-shot invocation that finds nothing new still persists a baseline for the next one")
+func testOneShotWithNothingNewStillPersistsBaseline() {
+    var logPathBuf: [PATH_BUF_SIZE]char
+    var offsetPathBuf: [PATH_BUF_SIZE]char
+    var logPath = watcherTestPath(logPathBuf, "oneshot_baseline.log")
+    var offsetPath = watcherTestPath(offsetPathBuf, "oneshot_baseline.offset")
+    remove(logPath.buffer)
+    remove(offsetPath.buffer)
+
+    // Simulates a systemd-timer-style invocation: a brand new process
+    // (fresh LogWatcher instance) that finds nothing new to dispatch on
+    // its one and only poll, then exits — no long-running loop to fall
+    // back on to keep the offset in memory.
+    var watcherA: LogWatcher
+    watcherA.init(logPath, offsetPath, defaultAllocator)
+    var sinkA: RecordingSink
+    watcherA.addRule($"ERROR", $"", &sinkA)
+    watcherA.pollOnce()
+    assert(sinkA.count == 0)
+
+    // Content shows up *after* that first invocation exited (and after
+    // any pre-existing history would already have been skipped).
+    appendFile(logPath, "{\"level\":\"ERROR\",\"time\":\"t1\",\"msg\":\"should-not-be-swallowed\"}\n")
+
+    // A second fresh process/instance must still see it — not re-run the
+    // "no state file" history-skipping fallback and silently drop it.
+    var watcherB: LogWatcher
+    watcherB.init(logPath, offsetPath, defaultAllocator)
+    var sinkB: RecordingSink
+    watcherB.addRule($"ERROR", $"", &sinkB)
+    watcherB.pollOnce()
+
+    assert(sinkB.count == 1)
+    assert(strcmp(sinkB.msgs[0], "should-not-be-swallowed") == 0)
+}
+
+// -----------------------------------------------------------------------
+// NotifyEvent.getAttr
+// -----------------------------------------------------------------------
+
+@test("NotifyEvent.getAttr returns the matching value, or empty when absent")
+func testGetAttr() {
+    var logPathBuf: [PATH_BUF_SIZE]char
+    var offsetPathBuf: [PATH_BUF_SIZE]char
+    var logPath = watcherTestPath(logPathBuf, "get_attr.log")
+    var offsetPath = watcherTestPath(offsetPathBuf, "get_attr.offset")
+    remove(logPath.buffer)
+    remove(offsetPath.buffer)
+
+    var watcher: LogWatcher
+    watcher.init(logPath, offsetPath, defaultAllocator)
+
+    writeFile(logPath, "{\"level\":\"INFO\",\"time\":\"t1\",\"msg\":\"m\",\"attrs\":{\"code\":\"E501\"}}\n")
+
+    var sink: RecordingSink
+    watcher.addRule($"", $"", &sink) // matches everything
+
+    watcher.pollOnce()
+
+    assert(sink.count == 1)
+    var code = sink.attrValue(0, "code")
+    assert(code != null)
+    assert(strcmp(code, "E501") == 0)
+    assert(sink.attrValue(0, "missing") == null)
+}

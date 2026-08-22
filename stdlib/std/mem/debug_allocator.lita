@@ -2,6 +2,7 @@ import "std/mem"
 import "std/array"
 import "std/libc" as c
 import "std/string"
+import "std/thread"
 
 /**
 =========================================================
@@ -31,6 +32,7 @@ public struct DebugAllocator {
     totalAllocations: u32
     totalBytesAllocated: usize
     totalBytesFreed: usize
+    mtx: Mutex
 }
 
 public func (d: *DebugAllocator) init(alloc: *const Allocator = defaultAllocator) {
@@ -44,10 +46,12 @@ public func (d: *DebugAllocator) init(alloc: *const Allocator = defaultAllocator
     d.allocations.init(128, alloc)
     d.totalBytesAllocated = 0
     d.totalAllocations = 0
+    d.mtx.init()
 }
 
 public func (d: *DebugAllocator) free() {
     d.allocations.free()
+    d.mtx.destroy()
 }
 
 #if (DEBUG)
@@ -68,6 +72,8 @@ public func (d: *DebugAllocator) free() {
     public func (d: *DebugAllocator) malloc(size: usize,
                                             file: *const char,
                                             line: usize) : *void {
+        d.mtx.lock()
+        defer d.mtx.unlock()
 
         var allocationSize = sizeof(:Allocation) + size;
         var mem = d.decorated.alloc(allocationSize, file, line);
@@ -84,19 +90,6 @@ public func (d: *DebugAllocator) free() {
         d.allocations.add(allocation)
         d.totalBytesAllocated += size
         d.totalAllocations += 1
-
-        /*var mem = d.decorated.alloc(size)
-        if(mem) {
-            var allocation = new<Allocation>(d.decorated);
-            allocation.addr = mem
-            allocation.size = size
-            allocation.line = line
-            StringCopy(file, allocation.filename, MAX_PATH)
-
-            d.allocations.add(allocation)
-            d.totalBytesAllocated += size
-            d.totalAllocations += 1
-        }*/
 
         return allocation.addr;
     }
@@ -160,6 +153,9 @@ public func (d: *DebugAllocator) free() {
     }
 
     public func (d: *DebugAllocator) malloc(size: usize) : *void {
+        d.mtx.lock()
+        defer d.mtx.unlock()
+
         var allocationSize = sizeof(:Allocation) + size;
         var mem = d.decorated.alloc(allocationSize);
         if(!mem) {
@@ -220,6 +216,9 @@ func DebugFree(alloc: *const Allocator, ptr: *void) {
     }
 
     var debug = alloc as (*DebugAllocator);
+    debug.mtx.lock()
+    defer debug.mtx.unlock()
+
     var allocation = (ptr - sizeof(:Allocation)) as (*Allocation)
 
     var addr = ptr;

@@ -1808,6 +1808,14 @@ func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, type: *TypeInfo) : boo
         )
     }
 
+    if(!methodResult.symbol && type.sym && type.sym.genericCallsiteModule) {
+        methodResult = type.getMethod(
+            this.lita.strings,
+            type.sym.genericCallsiteModule,
+            expr.field.type.name
+        )
+    }
+
     var funcSym = methodResult.symbol
     if(funcSym) {
         var typeInfo = funcSym.type;
@@ -1822,6 +1830,17 @@ func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, type: *TypeInfo) : boo
         }
 
         if(funcSym.flags & SymbolFlags.IS_GENERIC_TEMPLATE) {
+            var hasCallsite = type.sym && type.sym.genericCallsiteModule
+            var previousContainer = this.genericContext.container
+
+            if(hasCallsite) {
+                this.genericContext.container = type.sym.genericCallsiteModule
+            }
+
+            defer if(hasCallsite) {
+                this.genericContext.container = previousContainer
+            }
+
             typeInfo = this.resolveTypeSpec(expr.field.type, SearchType.FUNC)
             if(!typeInfo) {
                 // TODO: mark an error?

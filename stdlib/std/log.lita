@@ -6,6 +6,7 @@ import "std/time"
 import "std/string"
 import "std/string/buffer"
 import "std/system"
+import "std/json"
 
 @asStr
 public enum LogLevel {
@@ -15,6 +16,25 @@ public enum LogLevel {
     WARN,
     ERROR,
     FATAL
+}
+
+// A single key/value pair attached to a log record. Rendered as a JSON
+// "attrs" object when LogFormat.JSON is active; silently dropped in
+// LogFormat.TEXT (there's nowhere to put it in the "[LEVEL] [time] msg"
+// line shape).
+public struct LogAttr {
+    name:  String
+    value: String
+}
+
+@asStr
+public enum LogFormat {
+    // Existing "[LEVEL] [timestamp] message" shape.
+    TEXT,
+
+    // One JSON object per line: {"level":...,"time":...,"msg":...,"attrs":{...}}.
+    // "attrs" is only present when the call site supplied at least one LogAttr.
+    JSON
 }
 
 @asStr
@@ -37,6 +57,7 @@ public struct LogOptions {
     outputFileName: String = $""
     logLevel: LogLevel = LogLevel.TRACE
     mode: LogMode = LogMode.SYNC
+    format: LogFormat = LogFormat.TEXT
 
     // Only used by ASYNC_RING: how many in-flight lines can be buffered
     // before new ones are dropped. Higher = more burst tolerance, at the
@@ -58,10 +79,12 @@ var outputFile: *FILE = null
 var mtx: Mutex;
 var logLevel: LogLevel = LogLevel.TRACE
 var logMode: LogMode = LogMode.SYNC
+var logFormat: LogFormat = LogFormat.TEXT
 var logExitOnFatal: bool = true
 var logAllocator: *const Allocator = null
 
 const MAX_LOG_LINE = 2048
+const MAX_LOG_ATTRS = 16
 
 // One fixed-size slot in the ring. `seq` holds the claim number whose data
 // currently lives here — not just a ready/not-ready flag — which is what
@@ -185,6 +208,7 @@ public func LogInit(options: *const LogOptions = null) {
     }
     logLevel = opts.logLevel
     logMode = opts.mode
+    logFormat = opts.format
     logExitOnFatal = opts.exitOnFatal
     logAllocator = opts.allocator
     if(!logAllocator) {
@@ -252,7 +276,11 @@ public func LogDroppedLines() : i64 {
     return ringBuffer.droppedLines.get()
 }
 
-public func Log(level: LogLevel, format: *const char, ...) {
+// Renamed from Log() to LogAt(): Log() is now the LogBuilder entry point
+// below, and LitaC has no function overloading to let both share the name.
+// (Nothing in-tree called the old Log(level, ...) directly — every call
+// site goes through Info()/Warn()/Error()/etc.)
+public func LogAt(level: LogLevel, format: *const char, ...) {
     var args: va_list;
     va_start(args, format);
     Logv(level, format, args)
@@ -260,6 +288,13 @@ public func Log(level: LogLevel, format: *const char, ...) {
 }
 
 public func Logv(level: LogLevel, format: *const char, args: va_list) {
+    formatAndEmit(level, null, 0, format, args)
+}
+
+// Shared by Logv() (no attrs) and LogBuilder's terminal methods (with
+// attrs). attrs/numAttrs are ignored entirely in LogFormat.TEXT — there's
+// no slot for them in the "[LEVEL] [time] msg" line shape.
+func formatAndEmit(level: LogLevel, attrs: *LogAttr, numAttrs: i32, format: *const char, args: va_list) {
     if(!logInitialized.get()) return;
     if(logLevel > level) return;
 
@@ -267,10 +302,41 @@ public func Logv(level: LogLevel, format: *const char, args: va_list) {
     var now = DateTimeNow()
     var nowStr = buffer.isoFormat(&now)
 
+    // Format the caller's message on its own first: JSON mode needs to
+    // escape it as a complete string, which can't happen while the
+    // %-directives are still being interpolated.
+    var msgLine: [MAX_LOG_LINE]char
+    var msgBuf = StringBufferInit(msgLine, MAX_LOG_LINE, 0)
+    msgBuf.appendv(format, args)
+
     var line: [MAX_LOG_LINE]char
     var sb = StringBufferInit(line, MAX_LOG_LINE, 0)
-    sb.append("[%s] [%s] ", LogLevelAsStr(level), nowStr)
-    sb.appendv(format, args)
+
+    if(logFormat == LogFormat.JSON) {
+        sb.append("{\"level\":\"%s\",\"time\":\"%s\",\"msg\":\"", LogLevelAsStr(level), nowStr)
+        JsonEscapeString(&sb, msgBuf.buffer, msgBuf.length)
+        sb.append("\"")
+
+        if(numAttrs > 0) {
+            sb.append(",\"attrs\":{")
+            for(var i = 0; i < numAttrs; i += 1) {
+                if(i > 0) {
+                    sb.append(",")
+                }
+                sb.append("\"")
+                JsonEscapeString(&sb, attrs[i].name.buffer, attrs[i].name.length)
+                sb.append("\":\"")
+                JsonEscapeString(&sb, attrs[i].value.buffer, attrs[i].value.length)
+                sb.append("\"")
+            }
+            sb.append("}")
+        }
+        sb.append("}\n")
+    }
+    else {
+        sb.append("[%s] [%s] ", LogLevelAsStr(level), nowStr)
+        sb.append("%.*s", msgBuf.length, msgBuf.buffer)
+    }
 
     if(logMode == LogMode.SYNC) {
         mtx.lock()
@@ -329,5 +395,70 @@ public func Panic(format: *const char, ...) {
     var args: va_list;
     va_start(args, format);
     Logv(LogLevel.FATAL, format, args)
+    va_end(args)
+}
+
+/**
+=========================================================
+// LogBuilder — attaches structured LogAttr pairs to a record
+=========================================================
+
+    Log().attr($"user_id", uidStr).attr($"code", codeStr).error("listRules DB error")
+
+.attr() accumulates and returns *LogBuilder for further chaining. .info()/
+.warn()/.error() are the terminal calls: they format the message and
+flush the record immediately, so attrs must be attached *before* the level
+call, not after — there's no way to append to a record already written to
+the ring buffer/file. Call sites with nothing to attach should keep using
+the plain Info()/Warn()/Error() functions instead of this builder.
+*/
+public struct LogBuilder {
+    attrs: [MAX_LOG_ATTRS]LogAttr
+    numAttrs: i32
+}
+
+// Backing storage for Log()'s returned pointer. A pointer-receiver method
+// (.attr()) can't be called directly on an rvalue struct, so Log() can't
+// just return LogBuilder by value and let call sites chain off of it —
+// it needs to return *LogBuilder instead. That pointer can't point at a
+// local (dangling once Log() returns), so it points here: one scratch
+// instance per thread, reset at the start of each Log() call. Safe as
+// long as a chain is used immediately and not stashed across statements
+// or interleaved with another Log() call on the same thread mid-chain.
+@threadlocal
+var logBuilderScratch: LogBuilder;
+
+public func Log() : *LogBuilder {
+    logBuilderScratch = LogBuilder{}
+    logBuilderScratch.numAttrs = 0
+    return &logBuilderScratch
+}
+
+public func (b: *LogBuilder) attr(name: String, value: String) : *LogBuilder {
+    if(b.numAttrs < MAX_LOG_ATTRS) {
+        b.attrs[b.numAttrs] = LogAttr { .name = name, .value = value }
+        b.numAttrs += 1
+    }
+    return b
+}
+
+public func (b: *LogBuilder) info(format: *const char, ...) {
+    var args: va_list;
+    va_start(args, format);
+    formatAndEmit(LogLevel.INFO, b.attrs, b.numAttrs, format, args)
+    va_end(args)
+}
+
+public func (b: *LogBuilder) warn(format: *const char, ...) {
+    var args: va_list;
+    va_start(args, format);
+    formatAndEmit(LogLevel.WARN, b.attrs, b.numAttrs, format, args)
+    va_end(args)
+}
+
+public func (b: *LogBuilder) error(format: *const char, ...) {
+    var args: va_list;
+    va_start(args, format);
+    formatAndEmit(LogLevel.ERROR, b.attrs, b.numAttrs, format, args)
     va_end(args)
 }

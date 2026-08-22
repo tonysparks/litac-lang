@@ -1,0 +1,49 @@
+import "std/log/watcher"
+import "std/libc"
+import "std/string"
+
+// RecordingSink — a NotifySink that copies every event it receives into
+// fixed buffers so tests can assert on them after the per-line arena
+// backing the original NotifyEvent has already been cleared.
+public const MAX_RECORDED = 16
+public const MAX_ATTRS_PER_EVENT = 8
+
+public struct RecordingSink {
+    count:      i32
+    levels:     [MAX_RECORDED][32]char
+    msgs:       [MAX_RECORDED][256]char
+    attrCounts: [MAX_RECORDED]i32
+    attrNames:  [MAX_RECORDED][MAX_ATTRS_PER_EVENT][64]char
+    attrValues: [MAX_RECORDED][MAX_ATTRS_PER_EVENT][64]char
+}
+
+public func (this: *RecordingSink) send(event: *NotifyEvent) : bool {
+    if(this.count >= MAX_RECORDED) {
+        return true
+    }
+    var i = this.count
+    event.level.copyTo(this.levels[i], 32)
+    event.msg.copyTo(this.msgs[i], 256)
+
+    var n = event.attrs.length
+    if(n > MAX_ATTRS_PER_EVENT) {
+        n = MAX_ATTRS_PER_EVENT
+    }
+    this.attrCounts[i] = n
+    for(var j = 0; j < n; j += 1) {
+        var a = event.attrs.elements[j]
+        a.name.copyTo(this.attrNames[i][j], 64)
+        a.value.copyTo(this.attrValues[i][j], 64)
+    }
+    this.count += 1
+    return true
+}
+
+public func (this: *RecordingSink) attrValue(eventIdx: i32, attrName: *const char) : *const char {
+    for(var j = 0; j < this.attrCounts[eventIdx]; j += 1) {
+        if(strcmp(this.attrNames[eventIdx][j], attrName) == 0) {
+            return this.attrValues[eventIdx][j]
+        }
+    }
+    return null
+}

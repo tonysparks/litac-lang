@@ -341,3 +341,117 @@ func testAsyncRingBackpressureDropsCleanly() {
         assert(count == 0 || count == 1)
     }
 }
+
+// -----------------------------------------------------------------------
+// LogFormat.JSON: one JSON object per line, attrs rendered as a sub-object
+// -----------------------------------------------------------------------
+
+@test("LogFormat.JSON renders level/time/msg as a single JSON object per line")
+func testJsonFormatBasic() {
+    var pathBuf: [PATH_BUF_SIZE]char
+    var path = logTestPath(pathBuf, "json_basic.log")
+    remove(path.buffer)
+
+    var opts = LogOptions{
+        .outputFileName = path,
+        .mode = LogMode.SYNC,
+        .format = LogFormat.JSON
+    }
+    LogInit(&opts)
+    defer LogShutdown()
+
+    Error("something-broke: %d", 42)
+
+    var content: StringBuilder
+    readTestFile(path, &content)
+    defer content.free()
+
+    assert(content.contains($"\"level\":\"ERROR\""))
+    assert(content.contains($"\"msg\":\"something-broke: 42\""))
+    assert(content.contains($"\"time\":\""))
+    // No attrs supplied — the attrs object must not appear at all.
+    assert(!content.contains($"\"attrs\""))
+}
+
+@test("LogFormat.TEXT ignores LogBuilder attrs entirely")
+func testTextFormatIgnoresAttrs() {
+    var pathBuf: [PATH_BUF_SIZE]char
+    var path = logTestPath(pathBuf, "text_ignores_attrs.log")
+    remove(path.buffer)
+
+    var opts = LogOptions{
+        .outputFileName = path,
+        .mode = LogMode.SYNC,
+        .format = LogFormat.TEXT
+    }
+    LogInit(&opts)
+    defer LogShutdown()
+
+    Log().attr($"user_id", $"123").error("thing-failed")
+
+    var content: StringBuilder
+    readTestFile(path, &content)
+    defer content.free()
+
+    assert(content.contains($"[ERROR]"))
+    assert(content.contains($"thing-failed"))
+    assert(!content.contains($"user_id"))
+    assert(!content.contains($"123"))
+}
+
+@test("LogBuilder attrs render as a JSON attrs object, keyed by attr name")
+func testLogBuilderAttrsInJson() {
+    var pathBuf: [PATH_BUF_SIZE]char
+    var path = logTestPath(pathBuf, "json_attrs.log")
+    remove(path.buffer)
+
+    var opts = LogOptions{
+        .outputFileName = path,
+        .mode = LogMode.SYNC,
+        .format = LogFormat.JSON
+    }
+    LogInit(&opts)
+    defer LogShutdown()
+
+    Log().attr($"user_id", $"123").attr($"event", $"user_signup").info("new user")
+
+    var content: StringBuilder
+    readTestFile(path, &content)
+    defer content.free()
+
+    assert(content.contains($"\"level\":\"INFO\""))
+    assert(content.contains($"\"msg\":\"new user\""))
+    assert(content.contains($"\"attrs\":{"))
+    assert(content.contains($"\"user_id\":\"123\""))
+    assert(content.contains($"\"event\":\"user_signup\""))
+}
+
+@test("LogFormat.JSON escapes embedded quotes/newlines so one record stays one line")
+func testJsonFormatEscapesSpecialChars() {
+    var pathBuf: [PATH_BUF_SIZE]char
+    var path = logTestPath(pathBuf, "json_escaping.log")
+    remove(path.buffer)
+
+    var opts = LogOptions{
+        .outputFileName = path,
+        .mode = LogMode.SYNC,
+        .format = LogFormat.JSON
+    }
+    LogInit(&opts)
+    defer LogShutdown()
+
+    // A message shaped like a multi-line DB error with an embedded quote —
+    // exactly the case that broke naive line-based log scraping before JSON.
+    Error("query failed: %s", "unexpected token \"FROM\"\nnear line 2")
+
+    var content: StringBuilder
+    readTestFile(path, &content)
+    defer content.free()
+
+    // The raw newline must never appear un-escaped in the output.
+    assert(!content.contains($"\"FROM\"\nnear"))
+    assert(content.contains($"\\\"FROM\\\""))
+    assert(content.contains($"\\n"))
+    // Exactly one JSON record was written for this one call.
+    assert(countOccurrences(&content, $"\"level\":\"ERROR\"") == 1)
+}

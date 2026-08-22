@@ -283,7 +283,7 @@ const escapeChars = [256]*const char {
     ['\0'] = "\\0",
 }
 
-public func JsonEscapeString(buf: *StringBuilder, string: *const char, length: i32) {
+public func JsonEscapeString(buf: *StringBuffer, string: *const char, length: i32) {
     for(var i = 0; i < length; i += 1) {
         var c:char = string[i]
         // string bytes must be zero-extended (not sign-extended) before use as a table

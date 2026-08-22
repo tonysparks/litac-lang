@@ -1,0 +1,418 @@
+import "std/mem"
+import "std/mem/linear_allocator"
+import "std/string"
+import "std/string/builder"
+import "std/array"
+import "std/json"
+import "std/http/http"
+import "std/map"
+import "std/libc"
+import "std/system"
+import "std/thread"
+import "std/log"
+import "std/io"
+
+/**
+=========================================================
+// LogWatcher — tails a LogFormat.JSON log file and dispatches matching
+// records to notification sinks (Slack, or anything else satisfying
+// NotifySink).
+=========================================================
+
+Deliberately decoupled from std/log itself beyond the wire format: this
+module never imports LogLevel/LogAttr, it only understands the JSON shape
+Logv() with LogFormat.JSON produces
+({"level":...,"time":...,"msg":...,"attrs":{...}}). That keeps it usable
+against any process emitting that shape, not just one linked against this
+exact build of std/log.
+
+Intended to run as its own long-lived process (see LogWatcher.run()),
+separate from the process doing the logging — see the design notes this
+package grew out of: a tailer survives the logged process crashing, an
+in-process hook does not.
+*/
+
+public struct NotifyAttr {
+    name:  String
+    value: String
+}
+
+public struct NotifyEvent {
+    level: String
+    time:  String
+    msg:   String
+    attrs: Array<NotifyAttr>
+}
+
+public func (this: *NotifyEvent) getAttr(name: String) : String {
+    for(var i = 0; i < this.attrs.length; i += 1) {
+        var a = this.attrs.getPtr(i)
+        if(a.name.equals(name)) {
+            return a.value
+        }
+    }
+    return $""
+}
+
+// ---------------------------------------------------------------
+// Sink — anything that can receive a NotifyEvent. Slack is the first
+// implementation (below); a future sink (email, PagerDuty, a generic
+// webhook) just needs a matching send() method, nothing here changes.
+// ---------------------------------------------------------------
+
+public trait NotifySink {
+    send: func(event: *NotifyEvent): bool
+}
+
+// ---------------------------------------------------------------
+// Router — level/attr match rules, each paired with a sink
+// ---------------------------------------------------------------
+
+public struct NotifyRule {
+    // Empty means "match any level".
+    level: String
+    // Empty means "don't filter on the event attr". Non-empty matches
+    // against event.getAttr("event").
+    event: String
+    sink:  NotifySink
+}
+
+public struct NotifyRouter {
+    rules: Array<NotifyRule>
+}
+
+public func (this: *NotifyRouter) init(allocator: *const Allocator) {
+    this.rules.init(8, allocator)
+}
+
+public func (this: *NotifyRouter) addRule(level: String, event: String, sink: NotifySink) {
+    this.rules.add(NotifyRule {
+        .level = level,
+        .event = event,
+        .sink  = sink
+    })
+}
+
+public func (this: *NotifyRouter) dispatch(event: *NotifyEvent) {
+    for(var i = 0; i < this.rules.length; i += 1) {
+        var rule = this.rules.getPtr(i)
+        if(!rule.level.empty() && !rule.level.equals(event.level)) {
+            continue
+        }
+        if(!rule.event.empty() && !rule.event.equals(event.getAttr($"event"))) {
+            continue
+        }
+        rule.sink.send(event)
+    }
+}
+
+// ---------------------------------------------------------------
+// JSON line -> NotifyEvent
+// ---------------------------------------------------------------
+
+// Parses one JSON log record. Returned NotifyEvent's strings are views
+// into memory owned by `allocator` (the parsed JsonNode tree) — the
+// caller must not use the event past that allocator being cleared/freed.
+func parseLogLine(line: String, allocator: *const Allocator) : *NotifyEvent {
+    var parser = JsonParserInit(allocator)
+    var root = parser.parseJson(line)
+    if(parser.hasError() || !root || !root.isObject()) {
+        return null
+    }
+
+    var event = new<NotifyEvent>(allocator)
+    event.level = StringInit(root.getStr("level", ""))
+    event.time  = StringInit(root.getStr("time", ""))
+    event.msg   = StringInit(root.getStr("msg", ""))
+    event.attrs.init(4, allocator)
+
+    var attrsNode = root.getObject("attrs")
+    if(attrsNode) {
+        var it = attrsNode.iter()
+        while(it.hasNext()) {
+            var entry = it.next()
+            event.attrs.add(NotifyAttr {
+                .name  = StringInit(entry.key),
+                .value = StringInit(entry.value.asString())
+            })
+        }
+    }
+
+    return event
+}
+
+// ---------------------------------------------------------------
+// FileTailer — follows a file from a persisted byte offset, one poll
+// at a time. Poll-based rather than inotify/kqueue: simple, portable
+// across the dev (macOS) / prod (Linux) split, and notification latency
+// of a second or two is fine for this use case.
+// ---------------------------------------------------------------
+
+const POLL_READ_CHUNK = 8192
+
+struct FileTailer {
+    path:            String
+    offsetStatePath: String
+    offset:          i64
+    pending:         StringBuilder // accumulates a line fread() split mid-record
+}
+
+func (this: *FileTailer) init(path: String, offsetStatePath: String, allocator: *const Allocator) {
+    this.path = path
+    this.offsetStatePath = offsetStatePath
+    this.pending = StringBuilderInit(POLL_READ_CHUNK, allocator)
+    this.offset = this.loadOffset()
+
+    // poll() only persists the offset when it finds new bytes to read.
+    // Under a one-shot invocation model (a fresh process per tick, e.g.
+    // a systemd timer instead of an in-process loop), a run that finds
+    // nothing new would otherwise exit without ever writing a state
+    // file — so the *next* invocation's loadOffset() would hit the same
+    // "no state file" fallback and recompute currentFileSize() against
+    // whatever the file has grown to by then, silently treating
+    // everything written in between as pre-existing history and
+    // skipping it. Persisting the baseline immediately, whether it came
+    // from an existing state file or the first-run fallback, closes
+    // that gap: every invocation after the very first one always has a
+    // real prior offset to resume from.
+    this.saveOffset()
+}
+
+func (this: *FileTailer) currentFileSize() : i64 {
+    var pathBuf: [MAX_PATH]char
+    this.path.copyTo(pathBuf, MAX_PATH)
+
+    var len = FileLength(pathBuf)
+    return len < 0 ? 0_i64 : len
+}
+
+func (this: *FileTailer) loadOffset() : i64 {
+    var stateBuf: [MAX_PATH]char
+    this.offsetStatePath.copyTo(stateBuf, MAX_PATH)
+
+    var f = fopen(stateBuf, "rb")
+    if(!f) {
+        // First run (no persisted offset yet): skip whatever history is
+        // already in the file rather than replaying it all as "new".
+        return this.currentFileSize()
+    }
+    defer fclose(f)
+
+    var buf: [32]char
+    var n = fread(buf, 1, 31, f)
+    buf[n] = 0
+    return strtol(buf, null, 10)
+}
+
+func (this: *FileTailer) saveOffset() {
+    var stateBuf: [MAX_PATH]char
+    this.offsetStatePath.copyTo(stateBuf, MAX_PATH)
+
+    var f = fopen(stateBuf, "wb")
+    if(!f) {
+        return;
+    }
+    defer fclose(f)
+
+    var buf: [32]char
+    var n = snprintf(buf, 32, "%lld", this.offset)
+    fwrite(buf, 1, n as (usize), f)
+}
+
+// Reads whatever's new since the last poll, dispatches each complete
+// line, and persists the new offset — but only past lines actually
+// dispatched, so a record split across two polls is never half-processed.
+func (this: *FileTailer) poll(lineAlloc: *LinearAllocator, router: *NotifyRouter) {
+    var pathBuf: [MAX_PATH]char
+    this.path.copyTo(pathBuf, MAX_PATH)
+
+    var f = fopen(pathBuf, "rb")
+    if(!f) {
+        return; // not there yet (or rotated out from under us) — retry next tick
+    }
+    defer fclose(f)
+
+    fseek(f, this.offset, SEEK_SET)
+
+    var buf: [POLL_READ_CHUNK]char
+    var advanced = false
+
+    while(true) {
+        var n = fread(buf, 1, POLL_READ_CHUNK, f)
+        if(n <= 0) {
+            break
+        }
+        this.pending.append("%.*s", n as (i32), buf)
+        advanced = true
+    }
+
+    if(!advanced) {
+        return;
+    }
+
+    // Extract every complete "...\n" line; whatever's left after the last
+    // newline stays in this.pending for the next poll to complete.
+    var content = StringInit(this.pending.buffer, this.pending.length)
+    var consumed = 0
+
+    while(true) {
+        var nlIdx = content.substring(consumed).indexOf($"\n")
+        if(nlIdx < 0) {
+            break
+        }
+
+        var lineEnd = consumed + nlIdx
+        var line = content.substring(consumed, lineEnd)
+        consumed = lineEnd + 1
+
+        if(!line.empty()) {
+            var event = parseLogLine(line, &lineAlloc.allocator)
+            if(event) {
+                router.dispatch(event)
+            }
+            lineAlloc.clear()
+        }
+    }
+
+    // Keep only the unconsumed tail for next time.
+    var remainder = content.substring(consumed)
+    var remainderCopy = StringBuilderInit(remainder.length + 1, this.pending.alloc)
+    remainderCopy.append("%.*s", remainder.length, remainder.buffer)
+    this.pending.free()
+    this.pending = remainderCopy
+
+    this.offset += consumed
+    this.saveOffset()
+}
+
+// ---------------------------------------------------------------
+// LogWatcher — ties a FileTailer to a NotifyRouter and runs the poll loop
+// ---------------------------------------------------------------
+
+const LINE_ARENA_SIZE = 64 * 1024
+
+public struct LogWatcher {
+    tailer: FileTailer
+    router: NotifyRouter
+    //@ai rename to linearAllocator
+    lineAlloc: LinearAllocator
+}
+
+// logPath: the LogFormat.JSON file to tail.
+// offsetStatePath: where the last-processed byte offset is persisted, so
+// a restart resumes instead of either replaying history or losing lines
+// written while this process was down.
+public func (this: *LogWatcher) init(
+    logPath: String,
+    offsetStatePath: String,
+    allocator: *const Allocator
+) {
+    this.tailer.init(logPath, offsetStatePath, allocator)
+    this.router.init(allocator)
+
+    var lineMem = allocator.alloc(LINE_ARENA_SIZE as (usize))
+    this.lineAlloc.init(lineMem, LINE_ARENA_SIZE as (usize))
+}
+
+public func (this: *LogWatcher) addRule(level: String, event: String, sink: NotifySink) {
+    this.router.addRule(level, event, sink)
+}
+
+// One read-and-dispatch pass over whatever's new since the last call.
+// Exposed separately from run() so callers (and tests) can drive their
+// own loop/scheduling instead of being locked into run()'s blocking one.
+//
+// Each parsed record is processed inside a per-line arena that's cleared
+// right after dispatch — mirrors the ringhttp per-request allocator
+// pattern rather than routing per-record allocations through
+// defaultAllocator, so a busy log file can't leak.
+public func (this: *LogWatcher) pollOnce() {
+    this.tailer.poll(&this.lineAlloc, &this.router)
+}
+
+// Blocks forever, calling pollOnce() every pollIntervalMs.
+//@ai can we just delete this?
+public func (this: *LogWatcher) run(pollIntervalMs: i64 = 1000) {
+    while(true) {
+        this.pollOnce()
+        ThreadSleepMSec(pollIntervalMs)
+    }
+}
+
+// ---------------------------------------------------------------
+// SlackWebhookSink — first concrete NotifySink implementation
+// ---------------------------------------------------------------
+
+const MAX_WEBHOOK_URL = 512
+
+public struct SlackWebhookSink {
+    webhookUrl: [MAX_WEBHOOK_URL]char
+    http:       Http
+    allocator:  *const Allocator
+}
+//@ai we should pass in the Http, so the caller can configure it
+public func (this: *SlackWebhookSink) init(webhookUrl: String, allocator: *const Allocator) : bool {
+    webhookUrl.copyTo(this.webhookUrl, MAX_WEBHOOK_URL)
+    this.allocator = allocator
+
+    var opts = HttpOptions { .verifySsl = true }
+    return this.http.init(&opts, allocator)
+}
+
+public func (this: *SlackWebhookSink) free() {
+    this.http.free()
+}
+
+public func (this: *SlackWebhookSink) send(event: *NotifyEvent) : bool {
+    var text = StringBuilderInit(1024, this.allocator)
+    defer text.free()
+
+    text.append("*[%.*s]* %.*s\n%.*s",
+        event.level.length, event.level.buffer,
+        event.time.length, event.time.buffer,
+        event.msg.length, event.msg.buffer
+    )
+
+    if(event.attrs.length > 0) {
+        text.append("\n_")
+        for(var i = 0; i < event.attrs.length; i += 1) {
+            var a = event.attrs.getPtr(i)
+            if(i > 0) {
+                text.append(", ")
+            }
+            text.append("%.*s=%.*s", a.name.length, a.name.buffer, a.value.length, a.value.buffer)
+        }
+        text.append("_")
+    }
+
+    var payload = StringBuilderInit(text.length + 32, this.allocator)
+    defer payload.free()
+    payload.append("{\"text\":\"")
+    JsonEscapeString(&payload.asBuffer, text.buffer, text.length)
+    payload.append("\"}")
+
+    var reqHeaders = HeadersInit(4, this.allocator)
+    defer reqHeaders.free()
+    reqHeaders.put($"Content-Type", $"application/json")
+
+    // Built in place, not assigned from separate locals: resp.body/
+    // resp.headers can get reallocated in place while curl writes the
+    // response (growing the StringBuilder/Map backing arrays), so a
+    // separate local copy freed independently afterward would free a
+    // stale pointer out from under the live one — a double-free.
+    var resp = HttpResponse {
+        .body    = StringBuilderInit(256, this.allocator),
+        .headers = HeadersInit(16, this.allocator),
+    }
+    defer resp.body.free()
+    defer resp.headers.free()
+
+    var url = this.webhookUrl as (*const char)
+    var ok = this.http.post(url, &resp, StringInit(payload.buffer, payload.length), &reqHeaders)
+    if(!ok || resp.statusCode != 200) {
+        Error("slack webhook post failed: status=%d body=%.*s\n",
+            resp.statusCode, resp.body.length, resp.body.buffer)
+        return false
+    }
+    return true
+}
