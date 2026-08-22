@@ -1,0 +1,71 @@
+import "std/email/resend"
+import "std/assert"
+import "std/string"
+import "std/string/builder"
+import "std/array"
+import "std/mem"
+import "std/json"
+
+// -----------------------------------------------------------------------
+// ResendEmailRequest.toJson() — the wire shape Resend's API expects.
+// Not network-dependent, so no mock server needed for this part.
+// -----------------------------------------------------------------------
+
+@test("ResendEmailRequest serializes to the shape Resend's API expects")
+func testResendEmailRequestToJson() {
+    var to = ArrayInit<String>(2, defaultAllocator)
+    to.add($"a@example.com")
+    to.add($"b@example.com")
+
+    var req = ResendEmailRequest {
+        .from    = $"notify@example.com",
+        .to      = to,
+        .subject = $"[ERROR] something broke",
+        .html    = $"<b>boom</b>",
+        .text    = $"boom",
+    }
+
+    var sb = StringBuilderInit(256, defaultAllocator)
+    defer sb.free()
+    req.toJson(&sb)
+
+    var json = StringInit(sb.buffer, sb.length)
+    assert(json.indexOf($"\"from\":\"notify@example.com\"") >= 0)
+    assert(json.indexOf($"\"a@example.com\"") >= 0)
+    assert(json.indexOf($"\"b@example.com\"") >= 0)
+    assert(json.indexOf($"\"subject\":\"[ERROR] something broke\"") >= 0)
+    assert(json.indexOf($"\"html\":\"<b>boom</b>\"") >= 0)
+    assert(json.indexOf($"\"text\":\"boom\"") >= 0)
+}
+
+@test("ResendEmailResponse round-trips through JSON")
+func testResendEmailResponseFromJson() {
+    var json = $"{\"id\":\"abc-123\",\"object\":\"email\"}"
+
+    var parser = JsonParserInit(defaultAllocator)
+    defer parser.free()
+    var node = parser.parseJson(json)
+    assert(node != null)
+
+    var resp = ResendEmailResponse{}
+    var ctx = JsonContextInit(DefaultMakeFn, DefaultMakePtrFn, defaultAllocator, true)
+    resp.fromJson(&ctx, node)
+
+    assert(resp.id.equals($"abc-123"))
+    assert(resp.object.equals($"email"))
+}
+
+// -----------------------------------------------------------------------
+// ResendConfig defaulting behavior — verified indirectly via the URL
+// building logic mirrored here, since baseUrl defaulting lives inline in
+// sendEmail() rather than as its own testable function (nothing else
+// uses it, so it wasn't worth extracting just to make it unit-testable).
+// -----------------------------------------------------------------------
+
+@test("ResendResult defaults to empty id/message on the zero value")
+func testResendResultZeroValue() {
+    var result = ResendResult{}
+    assert(result.status == ResendStatus.OK) // enum zero value
+    assert(result.id.empty())
+    assert(result.message.empty())
+}

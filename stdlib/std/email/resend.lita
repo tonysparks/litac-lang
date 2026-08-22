@@ -1,0 +1,147 @@
+import "std/http/http"
+import "std/map"
+import "std/string"
+import "std/string/builder"
+import "std/string/buffer"
+import "std/array"
+import "std/json"
+import "std/json/from_json"
+import "std/json/to_json"
+import "std/mem"
+
+/**
+=========================================================
+// Resend (https://resend.com) transactional email API client
+=========================================================
+
+One HTTPS POST per send, JSON request/response — no SMTP protocol
+handling or RFC 5322 message construction on our end, Resend does all of
+that server-side. Prefer this over std/email's raw SmtpOptions/EmailClient
+whenever a Resend account is available: fewer moving parts, no MIME/SMTP
+edge cases to get wrong.
+*/
+
+@json
+public struct ResendEmailRequest {
+    from:    String
+    to:      Array<String>
+    subject: String
+    html:    String
+    text:    String
+}
+
+@json
+public struct ResendEmailResponse {
+    id:     String
+    object: String
+}
+
+@asStr
+public enum ResendStatus {
+    OK,
+    SEND_ERROR,
+}
+
+public struct ResendResult {
+    status: ResendStatus
+    // The Resend-assigned email id on success, empty on failure.
+    id:      String
+    // Empty on success. Allocator-backed on failure — valid as long as
+    // the allocator passed to sendEmail() isn't reset/freed before
+    // you're done with it, same lifetime rule as the rest of that call.
+    message: String
+}
+
+public struct ResendConfig {
+    apiKey:   String
+    fromAddr: String
+    // Empty defaults to "https://api.resend.com" — override for testing
+    // against a mock, or if Resend ever needs a region-specific host.
+    baseUrl:  String
+}
+
+public struct ResendClient {
+    config:     ResendConfig
+    httpClient: *Http
+}
+
+// httpClient is caller-owned (init/free it yourself) — same reasoning as
+// std/log/watcher's SlackWebhookSink: lets multiple clients/sinks in the
+// same process share one Http/curl handle instead of each owning its own.
+public func (this: *ResendClient) init(config: ResendConfig, httpClient: *Http) {
+    this.config = config
+    this.httpClient = httpClient
+}
+
+public func (this: *ResendClient) sendEmail(
+    to:        Array<String>,
+    subject:   String,
+    html:      String,
+    text:      String,
+    allocator: *const Allocator
+) : ResendResult {
+    var req = ResendEmailRequest {
+        .from    = this.config.fromAddr,
+        .to      = to,
+        .subject = subject,
+        .html    = html,
+        .text    = text,
+    }
+
+    var body = StringBuilderInit(512, allocator)
+    defer body.free()
+    req.toJson(&body)
+
+    var baseUrl = this.config.baseUrl
+    if(baseUrl.empty()) {
+        baseUrl = $"https://api.resend.com"
+    }
+
+    var url = StringBuilderInit(256, allocator)
+    defer url.free()
+    url.append("%.*s/emails", baseUrl.length, baseUrl.buffer)
+
+    var authHeader = StringBuilderInit(64 + this.config.apiKey.length, allocator)
+    defer authHeader.free()
+    authHeader.append("Bearer %.*s", this.config.apiKey.length, this.config.apiKey.buffer)
+
+    var headers = HeadersInit(16, allocator)
+    defer headers.free()
+    headers.put($"Content-Type", $"application/json")
+    headers.put($"Authorization", authHeader.toString())
+
+    var resp = HttpResponse {
+        .body    = StringBuilderInit(1024, allocator),
+        .headers = HeadersInit(16, allocator),
+    }
+    defer resp.body.free()
+    defer resp.headers.free()
+
+    this.httpClient.post(url.cStr(), &resp, body.toString(), &headers)
+
+    if(resp.statusCode != 200 && resp.statusCode != 201) {
+        var msg = StringBuilderInit(64 + resp.body.length, allocator)
+        msg.append("Resend send failed: status=%d body=%.*s",
+            resp.statusCode, resp.body.length, resp.body.buffer)
+        return ResendResult {
+            .status  = ResendStatus.SEND_ERROR,
+            .id      = $"",
+            .message = msg.toString(),
+        }
+    }
+
+    var parsedResp = ResendEmailResponse{}
+    var parser = JsonParserInit(allocator)
+    defer parser.free()
+    var jsonNode = parser.parseJson(resp.body.toString())
+    if(jsonNode) {
+        var ctx = JsonContextInit(DefaultMakeFn, DefaultMakePtrFn, allocator, true)
+        parsedResp.fromJson(&ctx, jsonNode)
+    }
+
+    return ResendResult {
+        .status  = ResendStatus.OK,
+        .id      = parsedResp.id,
+        .message = $"",
+    }
+}

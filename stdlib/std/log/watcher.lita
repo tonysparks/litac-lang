@@ -8,9 +8,9 @@ import "std/http/http"
 import "std/map"
 import "std/libc"
 import "std/system"
-import "std/thread"
 import "std/log"
 import "std/io"
+import "std/email/resend"
 
 /**
 =========================================================
@@ -26,10 +26,12 @@ Logv() with LogFormat.JSON produces
 against any process emitting that shape, not just one linked against this
 exact build of std/log.
 
-Intended to run as its own long-lived process (see LogWatcher.run()),
-separate from the process doing the logging — see the design notes this
-package grew out of: a tailer survives the logged process crashing, an
-in-process hook does not.
+Intended to run as its own process, separate from the process doing the
+logging — see the design notes this package grew out of: a tailer
+survives the logged process crashing, an in-process hook does not.
+LogWatcher.pollOnce() does one read-and-dispatch pass and returns; how
+often that happens is left to the caller (a systemd timer invoking a
+one-shot binary is the common case, not an in-process loop).
 */
 
 public struct NotifyAttr {
@@ -222,7 +224,7 @@ func (this: *FileTailer) saveOffset() {
 // Reads whatever's new since the last poll, dispatches each complete
 // line, and persists the new offset — but only past lines actually
 // dispatched, so a record split across two polls is never half-processed.
-func (this: *FileTailer) poll(lineAlloc: *LinearAllocator, router: *NotifyRouter) {
+func (this: *FileTailer) poll(linearAllocator: *LinearAllocator, router: *NotifyRouter) {
     var pathBuf: [MAX_PATH]char
     this.path.copyTo(pathBuf, MAX_PATH)
 
@@ -266,11 +268,11 @@ func (this: *FileTailer) poll(lineAlloc: *LinearAllocator, router: *NotifyRouter
         consumed = lineEnd + 1
 
         if(!line.empty()) {
-            var event = parseLogLine(line, &lineAlloc.allocator)
+            var event = parseLogLine(line, &linearAllocator.allocator)
             if(event) {
                 router.dispatch(event)
             }
-            lineAlloc.clear()
+            linearAllocator.clear()
         }
     }
 
@@ -294,8 +296,7 @@ const LINE_ARENA_SIZE = 64 * 1024
 public struct LogWatcher {
     tailer: FileTailer
     router: NotifyRouter
-    //@ai rename to linearAllocator
-    lineAlloc: LinearAllocator
+    linearAllocator: LinearAllocator
 }
 
 // logPath: the LogFormat.JSON file to tail.
@@ -311,7 +312,7 @@ public func (this: *LogWatcher) init(
     this.router.init(allocator)
 
     var lineMem = allocator.alloc(LINE_ARENA_SIZE as (usize))
-    this.lineAlloc.init(lineMem, LINE_ARENA_SIZE as (usize))
+    this.linearAllocator.init(lineMem, LINE_ARENA_SIZE as (usize))
 }
 
 public func (this: *LogWatcher) addRule(level: String, event: String, sink: NotifySink) {
@@ -319,24 +320,16 @@ public func (this: *LogWatcher) addRule(level: String, event: String, sink: Noti
 }
 
 // One read-and-dispatch pass over whatever's new since the last call.
-// Exposed separately from run() so callers (and tests) can drive their
-// own loop/scheduling instead of being locked into run()'s blocking one.
+// Scheduling (how often, and whether this process stays resident between
+// calls) is entirely up to the caller — a one-shot binary invoked by a
+// systemd timer just calls this once and exits.
 //
 // Each parsed record is processed inside a per-line arena that's cleared
 // right after dispatch — mirrors the ringhttp per-request allocator
 // pattern rather than routing per-record allocations through
 // defaultAllocator, so a busy log file can't leak.
 public func (this: *LogWatcher) pollOnce() {
-    this.tailer.poll(&this.lineAlloc, &this.router)
-}
-
-// Blocks forever, calling pollOnce() every pollIntervalMs.
-//@ai can we just delete this?
-public func (this: *LogWatcher) run(pollIntervalMs: i64 = 1000) {
-    while(true) {
-        this.pollOnce()
-        ThreadSleepMSec(pollIntervalMs)
-    }
+    this.tailer.poll(&this.linearAllocator, &this.router)
 }
 
 // ---------------------------------------------------------------
@@ -347,20 +340,20 @@ const MAX_WEBHOOK_URL = 512
 
 public struct SlackWebhookSink {
     webhookUrl: [MAX_WEBHOOK_URL]char
-    http:       Http
+    http:       *Http
     allocator:  *const Allocator
 }
-//@ai we should pass in the Http, so the caller can configure it
-public func (this: *SlackWebhookSink) init(webhookUrl: String, allocator: *const Allocator) : bool {
+
+// http is caller-owned: the caller configures and .init()/.free()s it, so
+// multiple sinks pointed at the same destination (e.g. several
+// SlackWebhookSinks in the same process, all talking to the same Slack
+// workspace) can share one Http/curl handle instead of each owning its
+// own — and the caller controls HttpOptions (timeouts, proxy, TLS
+// verification) instead of being stuck with a hardcoded default.
+public func (this: *SlackWebhookSink) init(webhookUrl: String, http: *Http, allocator: *const Allocator) {
     webhookUrl.copyTo(this.webhookUrl, MAX_WEBHOOK_URL)
+    this.http = http
     this.allocator = allocator
-
-    var opts = HttpOptions { .verifySsl = true }
-    return this.http.init(&opts, allocator)
-}
-
-public func (this: *SlackWebhookSink) free() {
-    this.http.free()
 }
 
 public func (this: *SlackWebhookSink) send(event: *NotifyEvent) : bool {
@@ -412,6 +405,70 @@ public func (this: *SlackWebhookSink) send(event: *NotifyEvent) : bool {
     if(!ok || resp.statusCode != 200) {
         Error("slack webhook post failed: status=%d body=%.*s\n",
             resp.statusCode, resp.body.length, resp.body.buffer)
+        return false
+    }
+    return true
+}
+
+// ---------------------------------------------------------------
+// EmailSink — second concrete NotifySink implementation, over the Resend
+// transactional email API (std/email/resend) rather than raw SMTP: one
+// HTTPS POST, no MIME/SMTP protocol handling on our end.
+// ---------------------------------------------------------------
+
+public struct EmailSink {
+    resend:    ResendClient
+    toAddrs:   Array<String>
+    allocator: *const Allocator
+}
+
+// httpClient/toAddrs are caller-owned and must outlive this sink —
+// mirrors how SlackWebhookSink's http is caller-owned; this struct only
+// borrows them (see ResendClient.init's doc comment for why: sharing one
+// Http/curl handle across sinks instead of each owning its own).
+public func (this: *EmailSink) init(
+    config:     ResendConfig,
+    httpClient: *Http,
+    toAddrs:    Array<String>,
+    allocator:  *const Allocator
+) {
+    this.resend.init(config, httpClient)
+    this.toAddrs = toAddrs
+    this.allocator = allocator
+}
+
+public func (this: *EmailSink) send(event: *NotifyEvent) : bool {
+    var subject = StringBuilderInit(128, this.allocator)
+    defer subject.free()
+    subject.append("[%.*s] %.*s", event.level.length, event.level.buffer, event.msg.length, event.msg.buffer)
+
+    var body = StringBuilderInit(1024, this.allocator)
+    defer body.free()
+    body.append("[%.*s] %.*s\n\n%.*s",
+        event.level.length, event.level.buffer,
+        event.time.length, event.time.buffer,
+        event.msg.length, event.msg.buffer
+    )
+
+    if(event.attrs.length > 0) {
+        body.append("\n\nAttributes:\n")
+        for(var i = 0; i < event.attrs.length; i += 1) {
+            var a = event.attrs.getPtr(i)
+            body.append("  %.*s=%.*s\n", a.name.length, a.name.buffer, a.value.length, a.value.buffer)
+        }
+    }
+
+    var bodyStr = StringInit(body.buffer, body.length)
+    var result = this.resend.sendEmail(
+        this.toAddrs,
+        StringInit(subject.buffer, subject.length),
+        $"", // html — plain text only, no HTML alternative to offer
+        bodyStr,
+        this.allocator
+    )
+
+    if(result.status != ResendStatus.OK) {
+        Error("email sink send failed: %.*s\n", result.message.length, result.message.buffer)
         return false
     }
     return true
