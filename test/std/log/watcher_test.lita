@@ -207,6 +207,52 @@ func testResumesFromPersistedOffsetAcrossInstances() {
     assert(strcmp(sinkB.msgs[0], "after-restart") == 0)
 }
 
+@test("A same-path copytruncate rotation that regrows past the old offset is detected via fingerprint, not size alone")
+func testCopytruncateRotationPastOldOffsetDetected() {
+    var logPathBuf: [PATH_BUF_SIZE]char
+    var offsetPathBuf: [PATH_BUF_SIZE]char
+    var logPath = watcherTestPath(logPathBuf, "copytruncate.log")
+    var offsetPath = watcherTestPath(offsetPathBuf, "copytruncate.offset")
+    remove(logPath.buffer)
+    remove(offsetPath.buffer)
+
+    var watcherA: LogWatcher
+    watcherA.init(logPath, offsetPath, defaultAllocator)
+
+    writeFile(logPath, "{\"level\":\"ERROR\",\"time\":\"t0\",\"msg\":\"before-rotation\"}\n")
+
+    var sinkA: RecordingSink
+    watcherA.addRule($"ERROR", $"", &sinkA)
+    watcherA.pollOnce()
+    assert(sinkA.count == 1)
+
+    // Simulates copytruncate: same path, truncated back to 0 and rewritten
+    // — never a new inode, so nothing short of comparing actual content
+    // could tell this apart from normal growth. Deliberately regrows past
+    // the old offset (multiple lines vs. the original single line) so a
+    // plain "is the persisted offset still <= current size" check would
+    // see it as in-bounds and wrongly trust it.
+    writeFile(logPath,
+        "{\"level\":\"ERROR\",\"time\":\"t1\",\"msg\":\"after-rotation-1\"}\n{\"level\":\"ERROR\",\"time\":\"t2\",\"msg\":\"after-rotation-2\"}\n{\"level\":\"ERROR\",\"time\":\"t3\",\"msg\":\"after-rotation-3\"}\n"
+    )
+
+    // A fresh instance, as a systemd-timer tick would create.
+    var watcherB: LogWatcher
+    watcherB.init(logPath, offsetPath, defaultAllocator)
+    var sinkB: RecordingSink
+    watcherB.addRule($"ERROR", $"", &sinkB)
+    watcherB.pollOnce()
+
+    // Must see all three post-rotation lines from the start, not zero
+    // (which is what "offset still fits within the new, larger size, so
+    // just trust it" would silently produce), and not a fourth/garbled
+    // record from resuming mid-line at the stale byte position.
+    assert(sinkB.count == 3)
+    assert(strcmp(sinkB.msgs[0], "after-rotation-1") == 0)
+    assert(strcmp(sinkB.msgs[1], "after-rotation-2") == 0)
+    assert(strcmp(sinkB.msgs[2], "after-rotation-3") == 0)
+}
+
 @test("A corrupted persisted offset is discarded instead of causing an endless full replay")
 func testCorruptedOffsetFallsBackSafely() {
     var logPathBuf: [PATH_BUF_SIZE]char

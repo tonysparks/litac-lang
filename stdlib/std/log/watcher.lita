@@ -12,6 +12,7 @@ import "std/system"
 import "std/log"
 import "std/io"
 import "std/email/resend"
+import "std/encoding/hex"
 
 /**
 =========================================================
@@ -153,6 +154,17 @@ func parseLogLine(line: String, allocator: *const Allocator) : *NotifyEvent {
 
 const POLL_READ_CHUNK = 8192
 
+// Bytes captured from the start of the tailed file and persisted alongside
+// the offset, purely as an identity check — not a security hash, just
+// "does this still look like the same file generation." See loadOffset().
+// Long enough to reach past LogFormat.JSON's near-universal
+// {"level":"...","time":"...} boilerplate into content that actually
+// varies line to line (msg/attrs) — a short fingerprint risks matching
+// two genuinely different file generations that just happen to share the
+// same structural prefix.
+const FINGERPRINT_LEN = 64
+const STATE_BUF_SIZE = 192 // i64 digits/sign + ':' + hex fingerprint (128 chars) + slack
+
 struct FileTailer {
     path:            String
     offsetStatePath: String
@@ -189,6 +201,22 @@ func (this: *FileTailer) currentFileSize() : i64 {
     return len < 0 ? 0_i64 : len
 }
 
+// Reads up to FINGERPRINT_LEN bytes from the *start* of the tailed file
+// (independent of the current read offset) — an identity snapshot, not
+// tailed content.
+func (this: *FileTailer) readFingerprint(out: *u8) : i32 {
+    var pathBuf: [MAX_PATH]char
+    this.path.copyTo(pathBuf, MAX_PATH)
+
+    var f = fopen(pathBuf, "rb")
+    if(!f) {
+        return 0
+    }
+    defer fclose(f)
+
+    return fread(out, 1, FINGERPRINT_LEN as (usize), f) as (i32)
+}
+
 func (this: *FileTailer) loadOffset() : i64 {
     var stateBuf: [MAX_PATH]char
     this.offsetStatePath.copyTo(stateBuf, MAX_PATH)
@@ -201,25 +229,75 @@ func (this: *FileTailer) loadOffset() : i64 {
     }
     defer fclose(f)
 
-    var buf: [32]char
-    var n = fread(buf, 1, 31, f)
+    var buf: [STATE_BUF_SIZE]char
+    var n = fread(buf, 1, STATE_BUF_SIZE - 1, f)
     buf[n] = 0
-    var parsed = strtol(buf, null, 10)
 
-    // A negative or out-of-range value (corrupted state file, torn write,
-    // strtol clamping an unparseable string to LONG_MIN/MAX) must never be
-    // trusted as-is: fseek() on a bogus offset silently fails and leaves
-    // the read position wherever it already was, which then causes poll()
-    // to replay from byte 0 forever, re-dispatching everything on every
-    // single tick. Fall back to the same safe "skip existing history"
-    // behavior as a missing state file instead.
+    var content = StringInit(buf, n as (i32))
+    var sepIdx = content.indexOf($":")
     var size = this.currentFileSize()
-    if(parsed < 0 || parsed > size) {
-        Error("FileTailer: ignoring corrupt persisted offset %lld in '%.*s' (file size %lld) — resetting to current end of file\n",
-            parsed, this.offsetStatePath.length, this.offsetStatePath.buffer, size
+
+    if(sepIdx < 0) {
+        // No fingerprint present — stale pre-fingerprint format, or the
+        // file's simply corrupted. Either way there's nothing to verify
+        // identity against, so don't trust a bare number either.
+        Error("FileTailer: persisted state in '%.*s' has no fingerprint (stale format or corrupted) — resetting to current end of file\n",
+            this.offsetStatePath.length, this.offsetStatePath.buffer
         )
         return size
     }
+
+    var offsetBuf: [32]char
+    content.substring(0, sepIdx).copyTo(offsetBuf, 32)
+    var parsed = strtol(offsetBuf, null, 10)
+    var hexPrint = content.substring(sepIdx + 1)
+
+    // A negative value (corrupted state, torn write, strtol clamping an
+    // unparseable string) or one beyond the file's current size (the file
+    // is now smaller than where we left off — almost certainly truncated
+    // by a rotation) can't be resumed from meaningfully. Start over from
+    // whatever's here now rather than risk misreading stale content, or
+    // replaying the whole file forever via a silently-failing fseek.
+    if(parsed < 0 || parsed > size) {
+        Error("FileTailer: persisted offset %lld in '%.*s' is invalid for current file size %lld — treating as rotated, resuming from byte 0\n",
+            parsed, this.offsetStatePath.length, this.offsetStatePath.buffer, size
+        )
+        return 0
+    }
+
+    // The offset alone being in-bounds doesn't prove it still points at
+    // the same content: a copytruncate-style rotation keeps the same
+    // inode and can shrink-then-regrow past the old offset entirely
+    // between two polls, leaving a numerically "valid" offset that
+    // actually points at unrelated bytes from a different file
+    // generation. Verify the file still starts the way it did when this
+    // offset was saved before trusting it.
+    var currentPrint: [FINGERPRINT_LEN]u8
+    var currentPrintLen = this.readFingerprint(currentPrint)
+    var expectedLen = hexPrint.length / 2
+
+    var decodedPrint: [FINGERPRINT_LEN]u8
+    var decodeOk = expectedLen <= FINGERPRINT_LEN && HexDecode(hexPrint, decodedPrint)
+
+    // Compare only the overlap, not exact lengths: ordinary growth (more
+    // content appended since the fingerprint was saved) makes the current
+    // fingerprint region longer than what was persisted without anything
+    // having rotated — that's expected and fine, not a mismatch. A
+    // *shorter* current region than what was persisted, on the other
+    // hand, is never legitimate: the file's own start can't shrink from
+    // ordinary appends, so that alone means it was truncated.
+    var overlap = expectedLen
+    if(currentPrintLen < overlap) {
+        overlap = currentPrintLen
+    }
+
+    if(!decodeOk || currentPrintLen < expectedLen || memcmp(currentPrint, decodedPrint, overlap as (usize)) != 0) {
+        Error("FileTailer: '%.*s' no longer starts the way it did when offset %lld was saved — treating as rotated, resuming from byte 0\n",
+            this.path.length, this.path.buffer, parsed
+        )
+        return 0
+    }
+
     return parsed
 }
 
@@ -241,8 +319,14 @@ func (this: *FileTailer) saveOffset() {
     }
     defer fclose(f)
 
-    var buf: [32]char
-    var n = snprintf(buf, 32, "%lld", this.offset)
+    var fingerprint: [FINGERPRINT_LEN]u8
+    var fingerprintLen = this.readFingerprint(fingerprint)
+
+    var hexBuf: [FINGERPRINT_LEN * 2]char
+    HexEncode(fingerprint, fingerprintLen, hexBuf)
+
+    var buf: [STATE_BUF_SIZE]char
+    var n = snprintf(buf, STATE_BUF_SIZE, "%lld:%.*s", this.offset, fingerprintLen * 2, hexBuf)
     fwrite(buf, 1, n as (usize), f)
 }
 
