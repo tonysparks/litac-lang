@@ -317,11 +317,18 @@ public func (this: *Module) getMethodsForType(type: *TypeInfo, result: [MAX_METH
     return numOfSymbols
 }
 
+// key: the actual scope-registered name the match was found under, which
+// may differ from methodName (see getMethodsForTypeWithName).
+public struct MethodMatch {
+    symbol: *Symbol
+    key: InternedString
+}
+
 public func (this: *Module) getMethodsForTypeWithName(
     type: *TypeInfo,
     methodName: InternedString,
     maxResults: i32,
-    result: [MAX_METHODS_FOR_TYPE]*Symbol) : i32 {
+    result: [MAX_METHODS_FOR_TYPE]MethodMatch) : i32 {
 
     var numOfSymbols = 0
 
@@ -335,11 +342,15 @@ public func (this: *Module) getMethodsForTypeWithName(
                 continue
             }
 
+            // suffix match: n.key may be alias-qualified, methodName is bare
             if(!n.key.view.endsWith(methodName.view)) {
                 continue
             }
 
-            result[numOfSymbols] = sym
+            result[numOfSymbols] = MethodMatch {
+                .symbol = sym,
+                .key = n.key
+            }
             numOfSymbols += 1
 
             if(numOfSymbols >= maxResults && maxResults > 0) {

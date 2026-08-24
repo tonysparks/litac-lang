@@ -76,3 +76,16 @@ public func OpenFileInfo(
     result.fileSize = file.length()
     return result
 }
+
+// Wires a successfully-opened file (see OpenFileInfo) into the response as
+// a ResponseType.FILE — the fd-based path that gets a native sendfile
+// (kqueue) / splice (io_uring) send instead of buffering through the
+// response body. Caller still checks result.status themselves beforehand
+// (e.g. to answer 404 on ERROR_FILE_NOT_FOUND) — this assumes success.
+public func (this: *HttpResponse) file(result: FileOpenResult, contentType: String, status: i32 = 200) {
+    this.status = status
+    this.type = ResponseType.FILE
+    this.fileHandle = result.fd
+    this.fileSize = result.fileSize as (usize)
+    this.addHeader($"Content-Type", contentType)
+}

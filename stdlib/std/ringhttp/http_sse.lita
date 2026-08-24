@@ -6,6 +6,7 @@ import "std/mem"
 import "std/ringhttp/http_common"
 import "std/ringhttp/http_context"
 import "std/ringhttp/http_worker"
+import "std/ringhttp/http_response"
 
 @doc("An SSE event to push to a connected client")
 public struct SseEvent {
@@ -99,4 +100,12 @@ internal func (event: *SseEvent) serialize(output: *StringBuilder) {
 
     // Blank line signals end of event to the client
     output.append("\n")
+}
+
+// A single SSE event as a one-shot response body (e.g. a Datastar-style
+// signals update) — not a long-lived stream; see SseSession.send() for that.
+public func (this: *HttpResponse) eventStream(evt: SseEvent, status: i32 = 200) {
+    this.raw($"text/event-stream", status)
+    this.addHeaderStr("Cache-Control", "no-cache")
+    evt.serialize(&this.body)
 }

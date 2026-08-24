@@ -1,0 +1,9 @@
+// Package aggregator, `import using`-re-exporting the module that actually
+// declares Box/Labeled — mirrors std/ringhttp/ringhttp.lita re-exporting
+// http_response.lita. The bug this fixture exists for only reproduces
+// through this two-module shape: aliasing this aggregator (as
+// generic_method_alias_test.lita does) makes the aliased type's *declaring*
+// module (generic_method_alias_fixture_inner.lita) different from the
+// module the alias was actually registered against, which is exactly what
+// tripped up TypeInfo.getMethod()'s aliased-fallback path.
+import using "std/ringhttp/generic_method_alias_fixture_inner"

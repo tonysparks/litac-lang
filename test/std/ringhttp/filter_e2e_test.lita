@@ -11,12 +11,12 @@ import "std/thread"
 import "std/ringhttp"
 import "std/ringhttp/filter_e2e_server"
 
-const BASE = "http://localhost:8081"
+const BASE = "http://localhost:8082"
 
 var testHttp = http::Http{}
 
 var filterServerConfig = HttpConfig {
-    .port                    = 8081_u16,
+    .port                    = 8082_u16,
     .numThreads              = 4,
     .ioQueueDepth            = 16,
     .maxPoolSize             = 32,

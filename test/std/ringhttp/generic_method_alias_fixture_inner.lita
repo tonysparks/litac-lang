@@ -1,0 +1,23 @@
+// See generic_method_alias_fixture.lita — this is the "declaring" module in
+// the two-module structure the bug actually requires (mirrors
+// http_response.lita being the real declaring module behind the
+// std/ringhttp package aggregator).
+
+public struct Box {
+    tag: i32
+}
+
+// A generic method on a non-generic struct — same shape as the original
+// bug (HttpResponse.json<T>): the receiver type isn't generic, only this
+// method is.
+public func (this: *Box) identity<T>(value: T) : T {
+    return value
+}
+
+public trait Labeled {
+    label: func() : i32
+}
+
+public func (this: *Box) label() : i32 {
+    return this.tag
+}

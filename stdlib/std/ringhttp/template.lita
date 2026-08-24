@@ -291,16 +291,23 @@ public func GenerateFromTemplate(
     }
     output.appendStr("\n")
 
-    // Function signature: *TypeName when @type declared, *void otherwise
+    // Function signature: *TypeName when @type declared, *void otherwise.
+    // resp.ensureHtml() is a no-op if the response was already set up as
+    // HTML (status/type/Content-Type) by an earlier template fragment in the
+    // same response (e.g. a header partial rendered just before this one) —
+    // it only initializes when resp.type is still NONE, so composing several
+    // tmpl_*() calls into one response never clobbers what an earlier call
+    // already wrote to resp.body. Callers no longer need their own
+    // res.html() before rendering a template.
     if(!ctx.typeName.empty()) {
         output.append(
-            "public func %.*s_WriteTemplate(\n    resp: *HttpResponse,\n    input: *%.*s\n) : Status {\n    var out = &resp.body\n",
+            "public func %.*s_WriteTemplate(\n    resp: *HttpResponse,\n    input: *%.*s\n) : Status {\n    resp.ensureHtml()\n    var out = &resp.body\n",
             sname.length, sname.buffer,
             ctx.typeName.length, ctx.typeName.buffer
         )
     } else {
         output.append(
-            "public func %.*s_WriteTemplate(\n    resp: *HttpResponse,\n    input: *void\n) : Status {\n    var out = &resp.body\n",
+            "public func %.*s_WriteTemplate(\n    resp: *HttpResponse,\n    input: *void\n) : Status {\n    resp.ensureHtml()\n    var out = &resp.body\n",
             sname.length, sname.buffer
         )
     }

@@ -2246,11 +2246,14 @@ public func (this: *TypeInfo) getMethod(
 
             // now do the expensive path of looking at this modules imported
             // methods for this type.
-            var results: [MAX_METHODS_FOR_TYPE]*Symbol;
+            var results: [MAX_METHODS_FOR_TYPE]MethodMatch;
             var numFound = module.getMethodsForTypeWithName(this, funcNameInterned, .maxResults = 1, .result = results)
 
             if(numFound > 0) {
-                methodSym = results[0]
+                var foundMethod = &results[0]
+                // use the actual matched key, not the bare guess above
+                methodSym = foundMethod.symbol
+                funcNameInterned = foundMethod.key
             }
         }
         else {

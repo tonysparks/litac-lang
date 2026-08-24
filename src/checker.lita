@@ -590,7 +590,8 @@ public func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
             if(isMethod) {
                 var buffer = [MAX_SYMBOL_NAME]char;
 
-                // TODO: Fix bug with aliased types function names not resolving correctly
+                // Aliased-import generic-method resolution fix: see
+                // TypeInfo.getMethod() in types.lita.
                 if(!funcDecl.getName(buffer)) {
                     this.result.addError(decl.startPos, "invalid function name or method receiver type")
                     goto err;

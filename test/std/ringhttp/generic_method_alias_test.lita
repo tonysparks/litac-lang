@@ -1,0 +1,40 @@
+#if OS != "WINDOWS"
+import "std/assert"
+import "std/string"
+
+import "std/ringhttp/generic_method_alias_fixture" as fx
+
+// Regression test for the generic-method-resolution-under-aliased-import
+// bug (see TypeInfo.getMethod() in types.lita): a generic method call like
+// `res.json<T>(...)` failed to compile ("unknown type 'HttpResponse_json'")
+// specifically when the receiver's type came from an `import X as alias`
+// import, because the fallback lookup used for that case returned the
+// symbol's bare name instead of the alias-qualified key it was actually
+// registered under, breaking re-resolution on the type checker's second
+// pass over the call (attaching the inferred generic argument).
+//
+// This is exercised here through fx::Box (a plain, non-generic struct with a
+// generic method), not HttpResponse, to prove the fix is general rather
+// than something ringhttp-specific papering over the symptom.
+@test
+func testGenericMethodResolvesThroughAliasedImport() {
+    var box = fx::Box { .tag = 7 }
+
+    assert(box.identity(42) == 42)
+    assert(box.identity($"hi").equals($"hi"))
+}
+
+// Same aliased type, but dispatched through a trait pointer — makes sure
+// the fix to generic-method resolution doesn't disturb trait vtable
+// dispatch on a type reached the same way.
+@test
+func testTraitMethodResolvesThroughAliasedImportAlongsideGenericMethod() {
+    var box = fx::Box { .tag = 9 }
+
+    var labeled: fx::Labeled
+    labeled = &box
+
+    assert(labeled.label() == 9)
+    assert(box.identity(9) == 9)
+}
+#end

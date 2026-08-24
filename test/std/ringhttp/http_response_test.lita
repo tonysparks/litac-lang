@@ -1,7 +1,11 @@
 #if OS != "WINDOWS"
 import "std/assert"
 import "std/mem"
+import "std/string"
 import "std/string/builder"
+import "std/json"
+import "std/json/to_json"
+import "std/json/from_json"
 
 import "std/ringhttp"
 
@@ -40,4 +44,135 @@ func testResponseReset() {
     assert(resp.numberOfHeaders == 0)
     assert(resp.type == ResponseType.NONE)
 }
+
+@test
+func testResponseRaw() {
+    var resp = HttpResponse{}
+    resp.init(defaultAllocator)
+    defer resp.free()
+
+    resp.body.append("stale")
+    resp.raw($"application/xml", 201)
+
+    assert(resp.status == 201)
+    assert(resp.type == ResponseType.BODY)
+    assert(resp.body.length == 0)
+    assert(resp.headers[0].name.equals($"Content-Type"))
+    assert(resp.headers[0].values.equals($"application/xml"))
+}
+
+@test
+func testResponseHtml() {
+    var resp = HttpResponse{}
+    resp.init(defaultAllocator)
+    defer resp.free()
+
+    resp.html()
+    resp.body.append("<h1>hi</h1>")
+
+    assert(resp.status == 200)
+    assert(resp.type == ResponseType.BODY)
+    assert(resp.headers[0].values.equals($"text/html; charset=utf-8"))
+    assert(resp.body.contains($"<h1>hi</h1>"))
+}
+
+// The pattern generated *_WriteTemplate() functions rely on: first call sets
+// up status/type/Content-Type and clears the body, later calls in the same
+// response (e.g. header + page + footer fragments) must leave an
+// already-written body alone.
+@test
+func testResponseEnsureHtmlSetsUpOnce() {
+    var resp = HttpResponse{}
+    resp.init(defaultAllocator)
+    defer resp.free()
+
+    resp.ensureHtml()
+    resp.body.append("<header/>")
+    resp.ensureHtml()
+    resp.body.append("<page/>")
+    resp.ensureHtml()
+    resp.body.append("<footer/>")
+
+    assert(resp.status == 200)
+    assert(resp.type == ResponseType.BODY)
+    assert(resp.headers[0].values.equals($"text/html; charset=utf-8"))
+    assert(resp.numberOfHeaders == 1)
+    assert(resp.body.length == 25)
+    assert(resp.body.contains($"<header/><page/><footer/>"))
+}
+
+@test
+func testResponseEnsureHtmlNoopWhenAlreadyConfigured() {
+    var resp = HttpResponse{}
+    resp.init(defaultAllocator)
+    defer resp.free()
+
+    resp.text($"plain body", 202)
+    resp.ensureHtml()
+
+    assert(resp.status == 202)
+    assert(resp.headers[0].values.equals($"text/plain"))
+    assert(resp.body.contains($"plain body"))
+}
+
+@test
+func testResponseText() {
+    var resp = HttpResponse{}
+    resp.init(defaultAllocator)
+    defer resp.free()
+
+    resp.text($"plain body", 202)
+
+    assert(resp.status == 202)
+    assert(resp.type == ResponseType.BODY)
+    assert(resp.headers[0].values.equals($"text/plain"))
+    assert(resp.body.contains($"plain body"))
+}
+
+@json
+struct ResponseJsonTestPayload {
+    ok: bool
+    count: i32
+}
+
+@test
+func testResponseJson() {
+    var resp = HttpResponse{}
+    resp.init(defaultAllocator)
+    defer resp.free()
+
+    var payload = ResponseJsonTestPayload { .ok = true, .count = 3 }
+    resp.json(&payload, 200)
+
+    assert(resp.status == 200)
+    assert(resp.type == ResponseType.BODY)
+    assert(resp.headers[0].values.equals($"application/json"))
+    assert(resp.body.contains($"\"ok\":true"))
+    assert(resp.body.contains($"\"count\":3"))
+}
+
+// Free-function twin of json<T>() — see the comment on json<T>() in
+// http_response.lita for why this exists (generic *method* calls on a type
+// reached through an import alias don't currently resolve; this form isn't
+// affected). Not itself exercising an aliased import — that's covered by
+// cardmng's own build, the real aliased consumer.
+@test
+func testJsonResponseFreeFn() {
+    var resp = HttpResponse{}
+    resp.init(defaultAllocator)
+    defer resp.free()
+
+    var payload = ResponseJsonTestPayload { .ok = false, .count = 7 }
+    JsonResponse(&resp, &payload, 201)
+
+    assert(resp.status == 201)
+    assert(resp.type == ResponseType.BODY)
+    assert(resp.headers[0].values.equals($"application/json"))
+    assert(resp.body.contains($"\"ok\":false"))
+    assert(resp.body.contains($"\"count\":7"))
+}
+
+// res.eventStream(SseEvent, status) tests live in http_sse_test.lita, next
+// to the SseEvent struct and serialize() it shares with the long-lived
+// stream path.
 #end

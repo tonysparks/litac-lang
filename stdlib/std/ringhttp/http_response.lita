@@ -159,6 +159,51 @@ public func (this: *HttpResponse) redirectTo(path: *const char) {
     this.addHeaderStr("Location", path)
 }
 
+// ── Body response helpers ───────────────────────────────────────────────
+// Each overwrites the body (clears it first) rather than appending.
+
+// The primitive the rest build on: status + type + Content-Type, body cleared.
+public func (this: *HttpResponse) raw(contentType: String, status: i32 = 200) {
+    this.status = status
+    this.type = ResponseType.BODY
+    this.body.clear()
+    this.addHeader($"Content-Type", contentType)
+}
+
+public func (this: *HttpResponse) html(status: i32 = 200) {
+    this.raw($"text/html; charset=utf-8", status)
+}
+
+// Like html(), but a no-op once the response is already set up — lets
+// several tmpl_*() calls (header, page, footer) append to one body without
+// each one clearing what the last wrote.
+public func (this: *HttpResponse) ensureHtml() {
+    if(this.type == ResponseType.NONE) {
+        this.html()
+    }
+}
+
+public func (this: *HttpResponse) text(content: String, status: i32 = 200) {
+    this.raw($"text/plain", status)
+    this.body.appendString(content)
+}
+
+// data needs a toJson(*StringBuilder) method (every @json struct gets one).
+public func (this: *HttpResponse) json<T>(data: *T, status: i32 = 200) {
+    this.raw($"application/json", status)
+    data.toJson(&this.body)
+}
+
+// Free-function twin of json<T>() for callers that import ringhttp aliased.
+public func JsonResponse<T>(res: *HttpResponse, data: *T, status: i32 = 200) {
+    res.raw($"application/json", status)
+    data.toJson(&res.body)
+}
+
+// eventStream(SseEvent, status) — a single SSE event as a one-shot response
+// body — lives in http_sse.lita, next to the SseEvent struct it shares with
+// the long-lived-stream path (SseSession.send()).
+
 public func (this: *HttpResponse) asStream(stream: Stream) {
     this.stream = stream
     this.type = ResponseType.STREAM

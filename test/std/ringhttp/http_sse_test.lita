@@ -230,6 +230,44 @@ func test_sse_multiline_data() {
 }
 
 // ---------------------------------------------------------------
+// res.eventStream(SseEvent, status) — one-shot SSE response, not the
+// long-lived stream path exercised above
+// ---------------------------------------------------------------
+
+@test("test HttpResponse.eventStream sets headers and formats a minimal event")
+func test_response_event_stream_minimal() {
+    var resp = HttpResponse{}
+    resp.init(defaultAllocator)
+    defer resp.free()
+
+    resp.eventStream(SseEvent { .data = $"hi" })
+
+    assert(resp.status == 200)
+    assert(resp.type == ResponseType.BODY)
+    assert(resp.headers[0].values.equals($"text/event-stream"))
+    assert(resp.headers[1].name.equals($"Cache-Control"))
+    assert(resp.headers[1].values.equals($"no-cache"))
+    assert(resp.body.contains($"data: hi\n\n"))
+}
+
+@test("test HttpResponse.eventStream formats id/event/retry/multiline data and honors status")
+func test_response_event_stream_all_fields() {
+    var resp = HttpResponse{}
+    resp.init(defaultAllocator)
+    defer resp.free()
+
+    resp.eventStream(SseEvent {
+        .event = $"signals",
+        .data  = $"line1\nline2",
+        .id    = $"42",
+        .retry = 3000,
+    }, 201)
+
+    assert(resp.status == 201)
+    assert(resp.body.contains($"retry: 3000\nid: 42\nevent: signals\ndata: line1\ndata: line2\n\n"))
+}
+
+// ---------------------------------------------------------------
 // Error-path tests
 // ---------------------------------------------------------------
 

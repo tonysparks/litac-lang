@@ -5,9 +5,11 @@ import "std/libc"
 import "std/assert"
 import "std/io"
 import "std/system"  // MAX_PATH is defined here
+import "std/string/builder"
 
 import "std/ringhttp/http_file"
 import "std/ringhttp/http_common"
+import "std/ringhttp/http_response"
 
 // Bug 9: OpenFile only checked path.length < MAX_PATH, not the combined
 // rootPath + "/" + path length.  A long rootPath could push the formatted
@@ -90,5 +92,25 @@ func testOpenFilePublicServerPathStripping() {
 func testOpenFileInfoNotFound() {
     var result = OpenFileInfo(StringInit("/tmp"), StringInit(""), StringInit("no_such_file_abc123.html"))
     assert(result.status == Status.ERROR_FILE_NOT_FOUND)
+}
+
+// resp.file() just wires a FileOpenResult's fields into the response — fd
+// left at 0 (rather than a real open handle) so resp.free()'s `close` guard
+// (fileHandle > 0) is a no-op here and this test doesn't touch a real fd.
+@test
+func testResponseFile() {
+    var resp = HttpResponse{}
+    resp.init(defaultAllocator)
+    defer resp.free()
+
+    var result = FileOpenResult { .fd = 0, .fileSize = 1234_i64, .status = Status.OK }
+    resp.file(result, StringInit("application/javascript"), 200)
+
+    assert(resp.status == 200)
+    assert(resp.type == ResponseType.FILE)
+    assert(resp.fileHandle == 0)
+    assert(resp.fileSize == 1234)
+    assert(resp.headers[0].name.equals(StringInit("Content-Type")))
+    assert(resp.headers[0].values.equals(StringInit("application/javascript")))
 }
 #end
