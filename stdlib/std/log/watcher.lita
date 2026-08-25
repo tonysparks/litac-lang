@@ -503,7 +503,7 @@ public func (this: *SlackWebhookSink) send(event: *NotifyEvent) : bool {
     var payload = StringBuilderInit(text.length + 32, this.allocator)
     defer payload.free()
     payload.append("{\"text\":\"")
-    JsonEscapeString(&payload.asBuffer, text.buffer, text.length)
+    JsonEscapeStringBuilder(&payload, text.buffer, text.length)
     payload.append("\"}")
 
     var reqHeaders = HeadersInit(4, this.allocator)

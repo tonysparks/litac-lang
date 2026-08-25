@@ -254,7 +254,7 @@ public func CreateJsonString(str: *const char, len: i32 = -1,
 
     var sb = StringBuilderInit(len + 1, alloc)
     //sb.appendStrn(str, len)
-    JsonEscapeString(sb, str, len)
+    JsonEscapeStringBuilder(sb, str, len)
 
     return CreateJsonStringNoDup(sb.cStr(), alloc)
 }
@@ -324,6 +324,30 @@ public func JsonEscapeString(buf: *StringBuffer, string: *const char, length: i3
         }
         buf.appendChar(c)
 */
+    }
+}
+
+// Same escaping as JsonEscapeString, but for a caller backed by a real
+// StringBuilder (heap-growable) rather than a fixed-size StringBuffer view
+// over a stack array. Taking buf as *StringBuffer there — even when the
+// argument is actually a StringBuilder upcast through its embedded `using
+// StringBuffer` field — statically binds every buf.appendChar/appendStr
+// call to StringBuffer's fixed-capacity methods, which silently stop
+// writing once the buffer's *capacity at call time* is reached instead of
+// growing it. Taking buf as *StringBuilder here instead binds those same
+// calls to StringBuilder's own growable methods, so long strings that
+// cross a growth boundary mid-escape no longer get silently truncated.
+public func JsonEscapeStringBuilder(buf: *StringBuilder, string: *const char, length: i32) {
+    for(var i = 0; i < length; i += 1) {
+        var c:char = string[i]
+        var escaped = escapeStrings[(c as (u8)) as (u32)]
+        if(escaped) {
+            buf.appendStr(escaped)
+            continue
+        }
+        else {
+            buf.appendChar(c)
+        }
     }
 }
 

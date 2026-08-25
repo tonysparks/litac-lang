@@ -240,7 +240,7 @@ func PrintHeaders(headers: *Array<HttpHeader>, res: *HttpResponse, allocator: *c
         res.body.append("{ ")
         res.body.append("\"name\": \"%.*s\", ", header.name.length, header.name.buffer)
 
-        JsonEscapeString(sb, header.values.buffer, header.values.length)
+        JsonEscapeStringBuilder(sb, header.values.buffer, header.values.length)
         res.body.append("\"value\": \"%.*s\"", sb.length, sb.buffer)
         res.body.append("} ")
 
@@ -288,7 +288,7 @@ func PrintBody(body: *Body, res: *HttpResponse, allocator: *const Allocator) {
         }
         case BodyType.FORMDATA: {
             var sb = StringBuilderInit(body.formData.value.length + 32, allocator)
-            JsonEscapeString(sb, body.formData.value.buffer, body.formData.value.length)
+            JsonEscapeStringBuilder(sb, body.formData.value.buffer, body.formData.value.length)
 
             res.body.append("{")
             res.body.append(" \"form_data\": {")
@@ -301,7 +301,7 @@ func PrintBody(body: *Body, res: *HttpResponse, allocator: *const Allocator) {
         }
         default: {
             var sb = StringBuilderInit(body.length + 32, allocator)
-            JsonEscapeString(sb, body.buffer, body.length)
+            JsonEscapeStringBuilder(sb, body.buffer, body.length)
 
             res.body.append("{ \"body\": ")
             res.body.append("\"%.*s\"", sb.length, sb.buffer)

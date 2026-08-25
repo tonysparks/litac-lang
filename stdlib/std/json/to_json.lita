@@ -51,25 +51,25 @@ public func (this: *const char) toJson(sb: *StringBuilder) {
         return;
     }
     sb.appendChar('"')
-    JsonEscapeString(sb, this, this.length())
+    JsonEscapeStringBuilder(sb, this, this.length())
     sb.appendChar('"')
 }
 
 public func (this: String) toJson(sb: *StringBuilder) {
     sb.appendChar('"')
-    JsonEscapeString(sb, this.buffer, this.length)
+    JsonEscapeStringBuilder(sb, this.buffer, this.length)
     sb.appendChar('"')
 }
 
 public func (this: StringBuffer) toJson(sb: *StringBuilder) {
     sb.appendChar('"')
-    JsonEscapeString(sb, this.buffer, this.length)
+    JsonEscapeStringBuilder(sb, this.buffer, this.length)
     sb.appendChar('"')
 }
 
 public func (this: StringBuilder) toJson(sb: *StringBuilder) {
     sb.appendChar('"')
-    JsonEscapeString(sb, this.buffer, this.length)
+    JsonEscapeStringBuilder(sb, this.buffer, this.length)
     sb.appendChar('"')
 }
 

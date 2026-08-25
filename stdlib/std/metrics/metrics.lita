@@ -631,9 +631,9 @@ func appendJSONAttrs(buf: *StringBuilder, attrs: *Array<MetricAttr>) {
         }
         var a = attrs.get(i)
         buf.appendChar('"')
-        JsonEscapeString(buf, a.name, strlen(a.name))
+        JsonEscapeStringBuilder(buf, a.name, strlen(a.name))
         buf.appendStr("\":\"")
-        JsonEscapeString(buf, a.value, strlen(a.value))
+        JsonEscapeStringBuilder(buf, a.value, strlen(a.value))
         buf.appendChar('"')
     }
     buf.appendChar('}')
@@ -657,11 +657,11 @@ public func (this: *Registry) scrapeJSON(buf: *StringBuilder) {
                     if(!firstEntry) { buf.appendChar(',') }
                     firstEntry = false
                     buf.appendStr("{\"name\":\"")
-                    JsonEscapeString(buf, entry.name, strlen(entry.name))
+                    JsonEscapeStringBuilder(buf, entry.name, strlen(entry.name))
                     buf.appendChar('"')
                     if(entry.help != null && entry.help[0] != '\0') {
                         buf.appendStr(",\"help\":\"")
-                        JsonEscapeString(buf, entry.help, strlen(entry.help))
+                        JsonEscapeStringBuilder(buf, entry.help, strlen(entry.help))
                         buf.appendChar('"')
                     }
                     appendJSONAttrs(buf, &s.attrs)
@@ -675,11 +675,11 @@ public func (this: *Registry) scrapeJSON(buf: *StringBuilder) {
                     if(!firstEntry) { buf.appendChar(',') }
                     firstEntry = false
                     buf.appendStr("{\"name\":\"")
-                    JsonEscapeString(buf, entry.name, strlen(entry.name))
+                    JsonEscapeStringBuilder(buf, entry.name, strlen(entry.name))
                     buf.appendChar('"')
                     if(entry.help != null && entry.help[0] != '\0') {
                         buf.appendStr(",\"help\":\"")
-                        JsonEscapeString(buf, entry.help, strlen(entry.help))
+                        JsonEscapeStringBuilder(buf, entry.help, strlen(entry.help))
                         buf.appendChar('"')
                     }
                     appendJSONAttrs(buf, &s.attrs)
@@ -694,11 +694,11 @@ public func (this: *Registry) scrapeJSON(buf: *StringBuilder) {
                     if(!firstEntry) { buf.appendChar(',') }
                     firstEntry = false
                     buf.appendStr("{\"name\":\"")
-                    JsonEscapeString(buf, entry.name, strlen(entry.name))
+                    JsonEscapeStringBuilder(buf, entry.name, strlen(entry.name))
                     buf.appendChar('"')
                     if(entry.help != null && entry.help[0] != '\0') {
                         buf.appendStr(",\"help\":\"")
-                        JsonEscapeString(buf, entry.help, strlen(entry.help))
+                        JsonEscapeStringBuilder(buf, entry.help, strlen(entry.help))
                         buf.appendChar('"')
                     }
                     appendJSONAttrs(buf, &s.attrs)

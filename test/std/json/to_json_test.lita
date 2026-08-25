@@ -125,6 +125,34 @@ func testToJsonStringUtf8Emoji() {
     assert(memcmp(sb.buffer as (*const void), (&expected[0]) as (*const void), 6) == 0)
 }
 
+@test
+func testToJsonStringLongerThanInitialCapacityIsNotTruncated() {
+    // Regression: String.toJson() escapes into the destination StringBuilder
+    // via JsonEscapeString(buf: *StringBuffer, ...) — passing the builder
+    // through its embedded `using StringBuffer` field. That statically binds
+    // every buf.appendChar/appendStr call inside JsonEscapeString to
+    // StringBuffer's own fixed-capacity methods (which silently stop writing
+    // once length reaches capacity) instead of StringBuilder's growable
+    // ones, so a string whose escaped length crosses the builder's *current*
+    // capacity got silently cut off mid-value with no error — e.g. a long
+    // email address rendered on a page truncated to just its first several
+    // characters. Starting the builder well below the input's length forces
+    // at least one grow mid-string, exercising exactly that path.
+    var email = $"jordan.q.tester@example.com"
+
+    var sb = StringBuilderInit(8)
+    defer sb.free()
+    email.toJson(&sb)
+
+    var expected: [29]char
+    expected[0] = '"'
+    email.copyTo(&expected[1], 27, false)
+    expected[28] = '"'
+
+    assert(sb.length == 29)
+    assert(memcmp(sb.buffer as (*const void), (&expected[0]) as (*const void), 29) == 0)
+}
+
 // -------------------------------------------------------------------------
 // to_json — each escape sequence
 // -------------------------------------------------------------------------
