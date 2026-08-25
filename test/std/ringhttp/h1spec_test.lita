@@ -610,6 +610,15 @@ func testBadRequests() {
         h1OneShot(
             "GET / HTTP/1.1\r\nHost: localhost\r\nExpect: bogus\r\nConnection: close\r\n\r\n") == 417)
 
+    // Regression test: a multipart Content-Type whose body doesn't actually
+    // start with the declared boundary used to fall through to the generic
+    // sendServerError default (500) — this parse failure happens in
+    // handleHttpRequest, before routing, so it's a malformed *client*
+    // request regardless of which route it was headed to.
+    check(&p, &f, "11.6  malformed multipart boundary returns 400",
+        h1OneShot(
+            "POST / HTTP/1.1\r\nHost: localhost\r\nContent-Type: multipart/form-data; boundary=X\r\nContent-Length: 5\r\nConnection: close\r\n\r\nhello") == 400)
+
     printf("  %d passed, %d failed\n", p, f); assert(f == 0)
 }
 

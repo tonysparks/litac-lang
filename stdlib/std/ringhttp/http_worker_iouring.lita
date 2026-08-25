@@ -950,11 +950,25 @@ internal func (this: *WorkerThread) handleCompletionRing(
                     return this.sendNotFound(session, status)
                 }
                 Error("HTTP Request Bad Status %s with index: %d\n", StatusAsStr(status), session.index)
-                if(status == Status.ERROR_PARSING_HTTP_REQUEST ||
-                   status == Status.ERROR_WEB_SOCKET_SECURITY_KEY) {
-                    return this.sendBadRequest(session, status)
+                switch(status) {
+                    // These all mean the client sent a request body we couldn't make sense
+                    // of (malformed multipart boundary/headers, a bad form-urlencoded pair,
+                    // etc.) — a 400, not a 500. Left unclassified, they fell into the
+                    // sendServerError default below and got logged/returned as if cardmng's
+                    // own handler had failed, even though the request never reached routing.
+                    case Status.ERROR_PARSING_HTTP_REQUEST:
+                    case Status.ERROR_WEB_SOCKET_SECURITY_KEY:
+                    case Status.ERROR_HTTP_PARSING_INVALID_FORM_URLENCODED_PARAM:
+                    case Status.ERROR_HTTP_PARSING_INVALID_MULTIPART_SECTION:
+                    case Status.ERROR_HTTP_PARSING_INVALID_MULTIPART_BOUNDARY:
+                    case Status.ERROR_HTTP_PARSING_INVALID_MULTIPART_HEADER:
+                    case Status.ERROR_HTTP_PARSING_INVALID_MULTIPART: {
+                        return this.sendBadRequest(session, status)
+                    }
+                    default: {
+                        return this.sendServerError(session, status)
+                    }
                 }
-                return this.sendServerError(session, status)
             }
             break
         }

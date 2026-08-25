@@ -722,12 +722,26 @@ func (this: *WorkerThread) handleReadReady(session: *SessionContext) {
                 }
                 else {
                     Error("HTTP request error %s for socket: %d\n", StatusAsStr(reqStatus), connection.handle())
-                    if(reqStatus == Status.ERROR_PARSING_HTTP_REQUEST ||
-                       reqStatus == Status.ERROR_WEB_SOCKET_SECURITY_KEY) {
-                        this.sendBadRequest(session, reqStatus)
-                    }
-                    else {
-                        this.sendServerError(session, reqStatus)
+                    // These all mean the client sent a request body we couldn't make sense
+                    // of (malformed multipart boundary/headers, a bad form-urlencoded pair,
+                    // etc.) — a 400, not a 500. Left unclassified, they fell into the
+                    // sendServerError default below and got logged/returned as if cardmng's
+                    // own handler had failed, even though the request never reached routing.
+                    switch(reqStatus) {
+                        case Status.ERROR_PARSING_HTTP_REQUEST:
+                        case Status.ERROR_WEB_SOCKET_SECURITY_KEY:
+                        case Status.ERROR_HTTP_PARSING_INVALID_FORM_URLENCODED_PARAM:
+                        case Status.ERROR_HTTP_PARSING_INVALID_MULTIPART_SECTION:
+                        case Status.ERROR_HTTP_PARSING_INVALID_MULTIPART_BOUNDARY:
+                        case Status.ERROR_HTTP_PARSING_INVALID_MULTIPART_HEADER:
+                        case Status.ERROR_HTTP_PARSING_INVALID_MULTIPART: {
+                            this.sendBadRequest(session, reqStatus)
+                            break
+                        }
+                        default: {
+                            this.sendServerError(session, reqStatus)
+                            break
+                        }
                     }
                 }
             }

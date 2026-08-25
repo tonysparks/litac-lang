@@ -2,6 +2,7 @@ import "std/mem"
 import "std/mem/linear_allocator"
 import "std/string"
 import "std/string/builder"
+import "std/string/buffer"
 import "std/array"
 import "std/json"
 import "std/http/http"
@@ -11,6 +12,7 @@ import "std/net/posix_socket"
 import "std/system"
 import "std/log"
 import "std/io"
+import "std/fmt"
 import "std/email/resend"
 import "std/encoding/hex"
 
@@ -247,18 +249,17 @@ func (this: *FileTailer) loadOffset() : i64 {
         return size
     }
 
-    var offsetBuf: [32]char
-    content.substring(0, sepIdx).copyTo(offsetBuf, 32)
-    var parsed = strtol(offsetBuf, null, 10)
+    var parseResult = content.substring(0, sepIdx).parseInt()
+    var parsed = parseResult.value
     var hexPrint = content.substring(sepIdx + 1)
 
-    // A negative value (corrupted state, torn write, strtol clamping an
-    // unparseable string) or one beyond the file's current size (the file
-    // is now smaller than where we left off — almost certainly truncated
-    // by a rotation) can't be resumed from meaningfully. Start over from
-    // whatever's here now rather than risk misreading stale content, or
-    // replaying the whole file forever via a silently-failing fseek.
-    if(parsed < 0 || parsed > size) {
+    // An unparseable or out-of-range value (corrupted state, torn write) or
+    // one beyond the file's current size (the file is now smaller than
+    // where we left off — almost certainly truncated by a rotation) can't
+    // be resumed from meaningfully. Start over from whatever's here now
+    // rather than risk misreading stale content, or replaying the whole
+    // file forever via a silently-failing fseek.
+    if(parseResult.len == 0 || parseResult.error != ParseError.NONE || parsed > size) {
         Error("FileTailer: persisted offset %lld in '%.*s' is invalid for current file size %lld — treating as rotated, resuming from byte 0\n",
             parsed, this.offsetStatePath.length, this.offsetStatePath.buffer, size
         )
@@ -326,8 +327,9 @@ func (this: *FileTailer) saveOffset() {
     HexEncode(fingerprint, fingerprintLen, hexBuf)
 
     var buf: [STATE_BUF_SIZE]char
-    var n = snprintf(buf, STATE_BUF_SIZE, "%lld:%.*s", this.offset, fingerprintLen * 2, hexBuf)
-    fwrite(buf, 1, n as (usize), f)
+    var sb = StringBufferInit(buf, STATE_BUF_SIZE, 0)
+    sb.append("%lld:%.*s", this.offset, fingerprintLen * 2, hexBuf)
+    fwrite(sb.buffer, 1, sb.length as (usize), f)
 }
 
 // Reads whatever's new since the last poll, dispatches each complete

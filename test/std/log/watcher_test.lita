@@ -297,6 +297,48 @@ func testCorruptedOffsetFallsBackSafely() {
     assert(strcmp(sinkB.msgs[0], "after-recovery") == 0)
 }
 
+@test("A persisted offset with a fingerprint present but a garbled numeric prefix is discarded, not silently taken as 0")
+func testMalformedNumericOffsetWithFingerprintDiscarded() {
+    var logPathBuf: [PATH_BUF_SIZE]char
+    var offsetPathBuf: [PATH_BUF_SIZE]char
+    var logPath = watcherTestPath(logPathBuf, "malformed_offset.log")
+    var offsetPath = watcherTestPath(offsetPathBuf, "malformed_offset.offset")
+    remove(logPath.buffer)
+    remove(offsetPath.buffer)
+
+    // Unlike testCorruptedOffsetFallsBackSafely (no ':' at all, which hits
+    // the "no fingerprint" branch and skips existing content like a first
+    // run), this has a fingerprint present but a numeric prefix that fails
+    // to parse cleanly — exercises the String.parseInt()/ParseError
+    // validation path specifically, which resumes from byte 0 instead
+    // (replaying existing content once rather than risking a silent skip
+    // from a position it can no longer trust).
+    writeFile(logPath, "{\"level\":\"ERROR\",\"time\":\"t0\",\"msg\":\"replayed-after-corruption\"}\n")
+    writeFile(offsetPath, "not-a-number:aabbccdd")
+
+    var watcherA: LogWatcher
+    watcherA.init(logPath, offsetPath, defaultAllocator)
+    var sinkA: RecordingSink
+    watcherA.addRule($"ERROR", $"", &sinkA)
+    watcherA.pollOnce()
+
+    // Resumes from byte 0 rather than trusting the garbled offset — the
+    // pre-existing line gets (re)dispatched exactly once here.
+    assert(sinkA.count == 1)
+    assert(strcmp(sinkA.msgs[0], "replayed-after-corruption") == 0)
+
+    appendFile(logPath, "{\"level\":\"ERROR\",\"time\":\"t1\",\"msg\":\"after-recovery\"}\n")
+
+    var watcherB: LogWatcher
+    watcherB.init(logPath, offsetPath, defaultAllocator)
+    var sinkB: RecordingSink
+    watcherB.addRule($"ERROR", $"", &sinkB)
+    watcherB.pollOnce()
+
+    assert(sinkB.count == 1)
+    assert(strcmp(sinkB.msgs[0], "after-recovery") == 0)
+}
+
 @test("A one-shot invocation that finds nothing new still persists a baseline for the next one")
 func testOneShotWithNothingNewStillPersistsBaseline() {
     var logPathBuf: [PATH_BUF_SIZE]char
