@@ -39,11 +39,17 @@ public struct SqliteResultSet {
     checkError: bool
 }
 
+// busyTimeoutMs bounds how long a call will block waiting for a lock held by
+// another connection before returning SQLITE_BUSY (0 disables waiting
+// entirely, matching SQLite's own default). Without this, any writer
+// contention — even under WAL, which still allows only one writer at a time
+// — fails immediately as "database is locked" instead of waiting briefly.
 public func Connect(
     filename: String,
     conn: *SqliteConnection,
     flags: i32 = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
     enableWAL: bool = true,
+    busyTimeoutMs: i32 = 5000,
     allocator: *const Allocator = defaultAllocator
 ) : SqlResult {
 
@@ -60,7 +66,10 @@ public func Connect(
     var errorCode = sqlite3_open_v2(filenameBuf, &conn.db, flags, null)
     if (errorCode != SQLITE_OK) {
         conn.error = CreateError(conn, null, errorCode)
+        return conn.error
     }
+
+    sqlite3_busy_timeout(conn.db, busyTimeoutMs)
 
     return enableWAL ? conn.enableWAL() : conn.error
 }
@@ -69,12 +78,14 @@ public func ConnectReadOnly(
     filename: String,
     conn: *SqliteConnection,
     flags: i32 = 0,
+    busyTimeoutMs: i32 = 5000,
     allocator: *const Allocator = defaultAllocator
 ) : SqlResult {
     return Connect(
         filename,
         conn,
         .flags = SQLITE_OPEN_READONLY | flags,
+        .busyTimeoutMs = busyTimeoutMs,
         .allocator = allocator
     )
 }

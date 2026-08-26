@@ -2,6 +2,7 @@ import "std/array"
 import "std/mem"
 import "std/thread"
 import "std/string"
+import "std/fmt"
 import "std/db"
 import "std/db/sqlite/sqlite_db"
 
@@ -45,6 +46,15 @@ public func (this: *UriParams) getBool(key: *const char, defaultVal: bool) : boo
     var val = this.get(key)
     if (val == null) return defaultVal
     return val.equals("true") || val.equals("1")
+}
+
+public func (this: *UriParams) getInt32(key: *const char, defaultVal: i32) : i32 {
+    var val = this.get(key)
+    if (val == null) return defaultVal
+
+    var result = val.toString().parseInt()
+    if (result.error != ParseError.NONE || result.len == 0) return defaultVal
+    return result.value as (i32)
 }
 
 // =========================================================================
@@ -149,6 +159,9 @@ public struct ConnectionPool {
 // Supported SQLite query params:
 //   wal=true|false    enable WAL mode (default true)
 //   readonly=true     open read-only (default false)
+//   timeout=<ms>      busy timeout in milliseconds (default 5000); how long a
+//                      connection will wait on a lock held by another writer
+//                      before returning "database is locked"
 public func ConnectionPoolInit(
     uri:    String,
     pool:   *ConnectionPool,
@@ -548,14 +561,15 @@ func SqliteDriverConnect(
         }
     }
 
-    var isReadonly = params.getBool("readonly", false)
-    var enableWal  = params.getBool("wal", true)
+    var isReadonly    = params.getBool("readonly", false)
+    var enableWal     = params.getBool("wal", true)
+    var busyTimeoutMs = params.getInt32("timeout", 5000)
 
     var result: SqlResult
     if (isReadonly) {
-        result = ConnectReadOnly(path, sqliteConn, .allocator = allocator)
+        result = ConnectReadOnly(path, sqliteConn, .busyTimeoutMs = busyTimeoutMs, .allocator = allocator)
     } else {
-        result = Connect(path, sqliteConn, .enableWAL = enableWal, .allocator = allocator)
+        result = Connect(path, sqliteConn, .enableWAL = enableWal, .busyTimeoutMs = busyTimeoutMs, .allocator = allocator)
     }
 
     if (result.isError()) {
