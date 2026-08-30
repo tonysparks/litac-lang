@@ -1,3 +1,9 @@
+// See watcher_test.lita — std/log/watcher (via std/net/posix_socket) doesn't
+// build on Windows; skipped there.
+#if OS == "WINDOWS"
+#ignore
+#end
+
 import "std/log/watcher"
 import "std/libc"
 import "std/string"

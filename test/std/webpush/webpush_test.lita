@@ -1,3 +1,11 @@
+// std/webpush is built on OpenSSL (std/crypto/ec for ECDH/VAPID, and the
+// AES-128-GCM functions from std/crypto/aes/aes_openssl); OpenSSL isn't
+// installed on the Windows CI runner (see .github/workflows/main.yml) —
+// skipped there.
+#if OS == "WINDOWS"
+#ignore
+#end
+
 import "std/webpush"
 import "std/crypto/ec"
 import "std/encoding/hex"

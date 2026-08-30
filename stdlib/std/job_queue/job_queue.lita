@@ -1,4 +1,5 @@
 import "std/mem"
+import "std/mem/bucket_allocator"
 import "std/string"
 import "std/string/buffer"
 import "std/libc"
@@ -6,6 +7,7 @@ import "std/log"
 import "std/thread"
 import "std/time"
 import "std/db"
+import "std/db/pool"
 import "std/system"
 import "std/atomic"
 
@@ -20,6 +22,13 @@ const ERROR_MSG_MAX     = 512_i32
 const DEFAULT_POLL_MS   = 100_i64
 const DEFAULT_MAX_TRIES = 3_i32
 const DEFAULT_STALE_SEC = 60_i64
+
+// Bucket size for the scratch arena backing statement wrappers prepared on
+// JobQueue.db. Every public JobQueue method clear()s the arena before touching
+// the connection, so one bucket only needs to hold a single method call's worth
+// of wrappers (a few dozen bytes each) plus the odd ~1KB error string; the
+// arena adds buckets on demand and clear() releases the extras.
+const JOB_QUEUE_SCRATCH_BYTES: usize = 8 * 1024
 
 // -----------------------------------------------------------------------
 // Public types
@@ -102,11 +111,13 @@ public enum JobStatus {
 
 public struct JobQueue {
     db:          SqlConnection
+    dbPool:      *ConnectionPool    // owns the db checkout; released in close()
+    scratch:     BucketAllocator    // per-call scratch backing db's statement wrappers
     mtx:         Mutex              // serializes db access across threads
     pollCounter: i64               // monotonically incremented per poll; makes locked_by unique
     queue:       [QUEUE_NAME_MAX]char
     queueLen:    i32
-    allocator:   *const Allocator
+    allocator:   *const Allocator   // backs scratch + job payload copies
 }
 
 // -----------------------------------------------------------------------
@@ -125,12 +136,14 @@ public struct Worker {
 // Open / Close
 // -----------------------------------------------------------------------
 
-// Open a job queue using an externally-managed database connection.
+// Open a job queue backed by a connection checked out from dbPool.
 // queueName scopes this instance to a named queue within that database.
 // Multiple named queues can coexist in the same database.
-// The caller owns the connection and must close it after closing the queue.
+// The queue owns the checked-out connection for its lifetime; close() returns
+// it to the pool. allocator backs the queue's per-call scratch arena (see
+// JOB_QUEUE_SCRATCH_BYTES) and the payload copy on each claimed Job.
 public func JobQueueOpen(
-    conn:      SqlConnection,
+    dbPool:    *ConnectionPool,
     queueName: *const char,
     queue:     *JobQueue,
     allocator: *const Allocator = defaultAllocator
@@ -142,19 +155,41 @@ public func JobQueueOpen(
         return JobStatus.ERROR_ARGS
     }
     name.copyTo(queue.queue, QUEUE_NAME_MAX)
-    queue.queueLen = name.length
-    queue.db       = conn
+    queue.queueLen  = name.length
+    queue.dbPool    = dbPool
     queue.allocator = allocator
 
-    if(!createSchema(queue)) {
+    queue.scratch.init(allocator, JOB_QUEUE_SCRATCH_BYTES)
+
+    var acq = dbPool.acquire(&queue.db, &queue.scratch.allocator)
+    if(acq.isError()) {
+        Error("job_queue: failed to acquire db connection: %.*s\n",
+            acq.description.length, acq.description.buffer)
+        queue.dbPool = null
+        queue.scratch.free()
         return JobStatus.ERROR_DB
     }
 
     queue.mtx.init()
+
+    if(!createSchema(queue)) {
+        dbPool.release(queue.db)
+        queue.dbPool = null
+        queue.mtx.destroy()
+        queue.scratch.free()
+        return JobStatus.ERROR_DB
+    }
+
     return JobStatus.OK
 }
 
+// Must only be called after a successful JobQueueOpen (matching the original
+// contract). Returns the pooled connection, frees the scratch arena, and
+// destroys the mutex.
 public func (q: *JobQueue) close() {
+    q.dbPool.release(q.db)   // pool re-stamps q.db's allocator to its own
+    q.dbPool = null
+    q.scratch.free()
     q.mtx.destroy()
 }
 
@@ -181,6 +216,7 @@ public func (q: *JobQueue) submit(
     q.mtx.lock()
     defer q.mtx.unlock()
 
+    q.scratch.clear()
     q.db.clearError()
 
     var stmt: SqlStatement
@@ -251,6 +287,7 @@ public func (q: *JobQueue) poll(job: *Job) : bool {
     var lb = StringBufferInit(lockedByBuf, LOCKED_BY_MAX, 0)
     lb.format("%d:%lld:%lld", ProcessId(), ThreadCurrent().id(), q.pollCounter)
 
+    q.scratch.clear()
     q.db.clearError()
 
     // Atomically claim the next eligible job.
@@ -364,6 +401,7 @@ public func (q: *JobQueue) complete(id: i64) : JobStatus {
     q.mtx.lock()
     defer q.mtx.unlock()
 
+    q.scratch.clear()
     q.db.clearError()
 
     var stmt: SqlStatement
@@ -401,6 +439,7 @@ public func (q: *JobQueue) fail(id: i64, errorMsg: *const char = null) : JobStat
     q.mtx.lock()
     defer q.mtx.unlock()
 
+    q.scratch.clear()
     q.db.clearError()
 
     // Read attempt counts to decide retry vs. final failure
@@ -497,6 +536,7 @@ public func (q: *JobQueue) retry(id: i64) : JobStatus {
     q.mtx.lock()
     defer q.mtx.unlock()
 
+    q.scratch.clear()
     q.db.clearError()
 
     var stmt: SqlStatement
@@ -534,6 +574,7 @@ public func (q: *JobQueue) recover(staleSec: i64 = DEFAULT_STALE_SEC) : JobStatu
     q.mtx.lock()
     defer q.mtx.unlock()
 
+    q.scratch.clear()
     q.db.clearError()
 
     var stmt: SqlStatement
@@ -575,6 +616,7 @@ public func (q: *JobQueue) stats() : JobStats {
     q.mtx.lock()
     defer q.mtx.unlock()
 
+    q.scratch.clear()
     q.db.clearError()
 
     var stmt: SqlStatement
@@ -617,6 +659,7 @@ public func (q: *JobQueue) getStatus(id: i64) : JobStatus {
     q.mtx.lock()
     defer q.mtx.unlock()
 
+    q.scratch.clear()
     q.db.clearError()
 
     var stmt: SqlStatement
