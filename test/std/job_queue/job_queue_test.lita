@@ -2,25 +2,39 @@ import "std/assert"
 import "std/string"
 import "std/thread"
 import "std/mem"
+import "std/mem/linear_allocator"
 import "std/job_queue"
 import "std/db"
-import "std/db/sqlite/sqlite_db"
+import "std/db/pool"
+
+const TEST_QUEUE_ARENA_BYTES: usize = 256 * 1024
 
 struct TestQueue {
-    conn: SqliteConnection
-    q:    JobQueue
+    pool:  ConnectionPool
+    q:     JobQueue
+    arena: LinearAllocator   // backs the pool + queue; freed wholesale in closeTestQueue
 }
 
 // Open an in-memory queue for testing via pointer to avoid fat-pointer aliasing.
+// Everything the pool and queue allocate rides `arena`, so closeTestQueue can
+// reclaim it in one free() and leak checks stay quiet.
 func openTestQueue(tq: *TestQueue, name: *const char = "test") {
-    var ok = Connect($":memory:", &tq.conn)
-    assert(ok.isOk())
-    assert(JobQueueOpen(tq.conn.connection, name, &tq.q, defaultAllocator) == JobStatus.OK)
+    tq.arena.init(defaultAllocator.alloc(TEST_QUEUE_ARENA_BYTES), TEST_QUEUE_ARENA_BYTES)
+    var arenaAlloc = &tq.arena.allocator
+
+    // maxSize = 1: a shared in-memory DB lives only as long as its one connection,
+    // so the queue must hold that single connection for its whole lifetime.
+    var pr = ConnectionPoolInit($"ldbc://sqlite/:memory:", &tq.pool,
+        PoolConfig { .minSize = 1, .maxSize = 1, .allocator = arenaAlloc })
+    assert(pr.isOk())
+
+    assert(JobQueueOpen(&tq.pool, name, &tq.q, arenaAlloc) == JobStatus.OK)
 }
 
 func closeTestQueue(tq: *TestQueue) {
     tq.q.close()
-    tq.conn.close()
+    tq.pool.destroy()
+    defaultAllocator.free(tq.arena.mem)
 }
 
 // -----------------------------------------------------------------------

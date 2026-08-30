@@ -1,10 +1,25 @@
 import "std/assert"
 import "std/mem"
+import "std/mem/linear_allocator"
 import "std/string"
 import "std/thread"
 import "std/db"
 import "std/db/sqlite/sqlite_db"
 import "std/db/pool"
+
+// Every test backs its pool + acquisitions with a local LinearAllocator and
+// frees the whole buffer at the end, so leak checks stay quiet no matter what
+// the pool does with the allocator it is handed.
+const POOL_TEST_ARENA: usize = 64 * 1024
+
+func arenaInit(lin: *LinearAllocator) : *const Allocator {
+    lin.init(defaultAllocator.alloc(POOL_TEST_ARENA), POOL_TEST_ARENA)
+    return &lin.allocator
+}
+
+func arenaFree(lin: *LinearAllocator) {
+    defaultAllocator.free(lin.mem)
+}
 
 // -----------------------------------------------------------------------
 // ConnectionPoolInit with in-memory SQLite
@@ -12,7 +27,12 @@ import "std/db/pool"
 
 @test
 func testPoolInit() {
+    var lin: LinearAllocator
+    var alloc = arenaInit(&lin)
+    defer arenaFree(&lin)
+
     var config = PoolConfig {
+        .allocator = alloc,
         .maxSize = 4,
         .minSize = 2,
     }
@@ -29,12 +49,16 @@ func testPoolInit() {
 
 @test
 func testReleaseClearsError() {
-    var config = PoolConfig { .maxSize = 2, .minSize = 1 }
+    var lin: LinearAllocator
+    var alloc = arenaInit(&lin)
+    defer arenaFree(&lin)
+
+    var config = PoolConfig { .allocator = alloc, .maxSize = 2, .minSize = 1 }
     var pool: ConnectionPool;
     ConnectionPoolInit($"ldbc://sqlite/:memory:", &pool, config)
 
     var conn: SqlConnection;
-    pool.acquire(&conn)
+    pool.acquire(&conn, alloc)
 
     // put the connection into an error state
     conn.setError(SqlResult {
@@ -46,7 +70,7 @@ func testReleaseClearsError() {
 
     // the same connection comes back from the idle pool — must be clean
     var conn2: SqlConnection;
-    pool.acquire(&conn2)
+    pool.acquire(&conn2, alloc)
     assert(!conn2.hasError())
     assert(conn2.lastResult().isOk())
 
@@ -60,13 +84,17 @@ func testReleaseClearsError() {
 
 @test
 func testAcquireRelease() {
-    var config = PoolConfig { .maxSize = 3, .minSize = 1 }
+    var lin: LinearAllocator
+    var alloc = arenaInit(&lin)
+    defer arenaFree(&lin)
+
+    var config = PoolConfig { .allocator = alloc, .maxSize = 3, .minSize = 1 }
     var pool: ConnectionPool;
     var result = ConnectionPoolInit($"ldbc://sqlite/:memory:", &pool, config)
     assert(!result.isError())
 
     var conn: SqlConnection;
-    result = pool.acquire(&conn)
+    result = pool.acquire(&conn, alloc)
     assert(!result.isError())
 
     // use the connection
@@ -83,17 +111,21 @@ func testAcquireRelease() {
 
 @test
 func testTryAcquireExhausted() {
-    var config = PoolConfig { .maxSize = 1, .minSize = 1 }
+    var lin: LinearAllocator
+    var alloc = arenaInit(&lin)
+    defer arenaFree(&lin)
+
+    var config = PoolConfig { .allocator = alloc, .maxSize = 1, .minSize = 1 }
     var pool: ConnectionPool;
     ConnectionPoolInit($"ldbc://sqlite/:memory:", &pool, config)
 
     // drain the single connection
     var conn: SqlConnection;
-    pool.acquire(&conn)
+    pool.acquire(&conn, alloc)
 
     // pool is now empty and at maxSize — tryAcquire must fail
     var conn2: SqlConnection;
-    var result = pool.tryAcquire(&conn2)
+    var result = pool.tryAcquire(&conn2, alloc)
     assert(result.isError())
 
     pool.release(conn)
@@ -106,7 +138,11 @@ func testTryAcquireExhausted() {
 
 @test
 func testLazyGrowth() {
-    var config = PoolConfig { .maxSize = 3, .minSize = 1 }
+    var lin: LinearAllocator
+    var alloc = arenaInit(&lin)
+    defer arenaFree(&lin)
+
+    var config = PoolConfig { .allocator = alloc, .maxSize = 3, .minSize = 1 }
     var pool: ConnectionPool;
     ConnectionPoolInit($"ldbc://sqlite/:memory:", &pool, config)
 
@@ -115,13 +151,13 @@ func testLazyGrowth() {
     var c1: SqlConnection;
     var c2: SqlConnection;
     var c3: SqlConnection;
-    pool.acquire(&c1)
+    pool.acquire(&c1, alloc)
     assert(pool.totalSize == 1)   // c1 came from idle
 
-    pool.acquire(&c2)
+    pool.acquire(&c2, alloc)
     assert(pool.totalSize == 2)   // c2 was freshly created
 
-    pool.acquire(&c3)
+    pool.acquire(&c3, alloc)
     assert(pool.totalSize == 3)   // c3 was freshly created
 
     pool.release(c1)
@@ -136,17 +172,21 @@ func testLazyGrowth() {
 
 @test
 func testReuseAfterRelease() {
-    var config = PoolConfig { .maxSize = 2, .minSize = 1 }
+    var lin: LinearAllocator
+    var alloc = arenaInit(&lin)
+    defer arenaFree(&lin)
+
+    var config = PoolConfig { .allocator = alloc, .maxSize = 2, .minSize = 1 }
     var pool: ConnectionPool;
     ConnectionPoolInit($"ldbc://sqlite/:memory:", &pool, config)
 
     var conn: SqlConnection;
-    pool.acquire(&conn)
+    pool.acquire(&conn, alloc)
     pool.release(conn)
 
     // should be back in idle — totalSize must not exceed 2
     var conn2: SqlConnection;
-    pool.acquire(&conn2)
+    pool.acquire(&conn2, alloc)
     assert(pool.totalSize <= 2)
 
     pool.release(conn2)
@@ -159,7 +199,11 @@ func testReuseAfterRelease() {
 
 @test
 func testUriParamWalFalse() {
-    var config = PoolConfig { .maxSize = 2, .minSize = 1 }
+    var lin: LinearAllocator
+    var alloc = arenaInit(&lin)
+    defer arenaFree(&lin)
+
+    var config = PoolConfig { .allocator = alloc, .maxSize = 2, .minSize = 1 }
     var pool: ConnectionPool;
     var result = ConnectionPoolInit($"ldbc://sqlite/:memory:?wal=false", &pool, config)
     assert(!result.isError())
@@ -197,12 +241,16 @@ func noopConnect(path: String, params: *UriParams,
 
 @test
 func testAcquireTimedSuccess() {
-    var config = PoolConfig { .maxSize = 2, .minSize = 1 }
+    var lin: LinearAllocator
+    var alloc = arenaInit(&lin)
+    defer arenaFree(&lin)
+
+    var config = PoolConfig { .allocator = alloc, .maxSize = 2, .minSize = 1 }
     var pool: ConnectionPool;
     ConnectionPoolInit($"ldbc://sqlite/:memory:", &pool, config)
 
     var conn: SqlConnection;
-    var result = pool.acquireTimed(1000, &conn)
+    var result = pool.acquireTimed(1000, &conn, alloc)
     assert(!result.isError())
 
     pool.release(conn)
@@ -215,17 +263,21 @@ func testAcquireTimedSuccess() {
 
 @test
 func testAcquireTimedTimeout() {
-    var config = PoolConfig { .maxSize = 1, .minSize = 1 }
+    var lin: LinearAllocator
+    var alloc = arenaInit(&lin)
+    defer arenaFree(&lin)
+
+    var config = PoolConfig { .allocator = alloc, .maxSize = 1, .minSize = 1 }
     var pool: ConnectionPool;
     ConnectionPoolInit($"ldbc://sqlite/:memory:", &pool, config)
 
     // drain the single connection
     var conn: SqlConnection;
-    pool.acquire(&conn)
+    pool.acquire(&conn, alloc)
 
     // pool is exhausted — acquireTimed must time out
     var conn2: SqlConnection;
-    var result = pool.acquireTimed(50, &conn2)
+    var result = pool.acquireTimed(50, &conn2, alloc)
     assert(result.isError())
 
     pool.release(conn)
@@ -233,37 +285,38 @@ func testAcquireTimedTimeout() {
 }
 
 // -----------------------------------------------------------------------
-// RegisterDriver: custom no-op driver
-// -----------------------------------------------------------------------
-
-// -----------------------------------------------------------------------
 // close interrupts a thread blocked in acquire
 // -----------------------------------------------------------------------
 
 struct CloseTestState {
     pool:   *ConnectionPool
+    alloc:  *const Allocator
     result: SqlResult
 }
 
 func blockedAcquireThread(arg: *void) : i32 {
     var state = arg as (*CloseTestState)
     var conn: SqlConnection;
-    state.result = state.pool.acquire(&conn)
+    state.result = state.pool.acquire(&conn, state.alloc)
     return 0
 }
 
 @test
 func testCloseInterruptsWaiter() {
-    var config = PoolConfig { .maxSize = 1, .minSize = 1 }
+    var lin: LinearAllocator
+    var alloc = arenaInit(&lin)
+    defer arenaFree(&lin)
+
+    var config = PoolConfig { .allocator = alloc, .maxSize = 1, .minSize = 1 }
     var pool: ConnectionPool;
     ConnectionPoolInit($"ldbc://sqlite/:memory:", &pool, config)
 
     // drain the only connection so the next acquire will block
     var conn: SqlConnection;
-    pool.acquire(&conn)
+    pool.acquire(&conn, alloc)
 
     // start a thread that will block in acquire()
-    var state = CloseTestState { .pool = &pool }
+    var state = CloseTestState { .pool = &pool, .alloc = alloc }
     var thread: Thread;
     thread.create(blockedAcquireThread, &state)
 
@@ -313,13 +366,14 @@ func testRegisterDriver() {
 
 struct DestroyRaceState {
     pool:   *ConnectionPool
+    alloc:  *const Allocator
     result: SqlResult
 }
 
 func blockedAcquireForDestroyRace(arg: *void) : i32 {
     var state = arg as (*DestroyRaceState)
     var conn: SqlConnection;
-    state.result = state.pool.acquire(&conn)
+    state.result = state.pool.acquire(&conn, state.alloc)
     return 0
 }
 
@@ -348,15 +402,18 @@ func waitUntilWaiting(pool: *ConnectionPool) {
 @test
 func testDestroyWhileWaiterBlocked() {
     for (var iter = 0; iter < 100; iter += 1) {
-        var config = PoolConfig { .maxSize = 1, .minSize = 1 }
+        var lin: LinearAllocator
+        var alloc = arenaInit(&lin)
+
+        var config = PoolConfig { .allocator = alloc, .maxSize = 1, .minSize = 1 }
         var pool: ConnectionPool;
         ConnectionPoolInit($"ldbc://sqlite/:memory:", &pool, config)
 
         // drain the only connection so the next acquire will block
         var conn: SqlConnection;
-        pool.acquire(&conn)
+        pool.acquire(&conn, alloc)
 
-        var state = DestroyRaceState { .pool = &pool }
+        var state = DestroyRaceState { .pool = &pool, .alloc = alloc }
         var thread: Thread;
         thread.create(blockedAcquireForDestroyRace, &state)
 
@@ -370,5 +427,7 @@ func testDestroyWhileWaiterBlocked() {
 
         thread.join()
         assert(state.result.isError())
+
+        arenaFree(&lin)
     }
 }
