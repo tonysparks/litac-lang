@@ -1,3 +1,9 @@
+// std/crypto/ec is OpenSSL-backed, which isn't installed on the Windows CI
+// runner (see .github/workflows/main.yml) — skipped there.
+#if OS == "WINDOWS"
+#ignore
+#end
+
 import "std/crypto/ec"
 import "std/assert"
 import "std/libc"

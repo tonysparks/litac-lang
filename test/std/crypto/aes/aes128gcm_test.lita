@@ -1,3 +1,11 @@
+// AES-128-GCM is only provided by the OpenSSL backend (std/crypto/aes/aes_openssl);
+// the Windows backend (aes_win, BCrypt) exposes AES-256-GCM only, and OpenSSL
+// isn't installed on the Windows CI runner (see .github/workflows/main.yml) —
+// skipped there.
+#if OS == "WINDOWS"
+#ignore
+#end
+
 import "std/crypto/aes"
 import "std/encoding/hex"
 import "std/string"

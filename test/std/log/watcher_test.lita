@@ -1,3 +1,9 @@
+// std/log/watcher imports std/net/posix_socket (BSD sockets: <sys/socket.h>,
+// <netinet/in.h>, …), which doesn't build on Windows — skipped there.
+#if OS == "WINDOWS"
+#ignore
+#end
+
 import "std/log/watcher"
 import "std/assert"
 import "std/string"
