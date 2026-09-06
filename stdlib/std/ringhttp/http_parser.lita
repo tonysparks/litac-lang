@@ -48,8 +48,13 @@ public func (this: *HttpParser) parse(input: String, result: *HttpRequest) : Sta
 
     // RFC 7230 §5.3.2: request-target may be in absolute-form (full URI).
     // Strip the scheme and authority so routing always sees an origin-form path.
+    // Only origin-form's alternatives (absolute-form, used by proxies) start
+    // without a leading '/' — checking that first keeps a "://" that just
+    // happens to appear inside a query value (e.g. an OAuth callback's
+    // scope=...https://www.googleapis.com/... or iss=https://accounts.google.com)
+    // from being mistaken for the request's own scheme.
     var rawPath = requestLine.substring(methodIndex + 1, pathIndex)
-    var schemeEnd = rawPath.indexOf($"://")
+    var schemeEnd = rawPath.startsWith($"/") ? -1 : rawPath.indexOf($"://")
     if(schemeEnd >= 0) {
         result.scheme = rawPath.substring(0, schemeEnd)
         var afterAuthority = rawPath.substring(schemeEnd + 3)
