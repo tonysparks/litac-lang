@@ -422,6 +422,24 @@ func testAbsoluteFormUriStripping() {
     assert(result4.path.equals($"/origin/path"))
 }
 
+// Fix C (parser): a "://" occurring inside a query value (e.g. an OAuth
+// callback's iss=https://accounts.google.com or scope=...https://...) must
+// not be mistaken for an absolute-form request-target — origin-form always
+// starts with '/', so only a target lacking that leading '/' can be absolute-form.
+@test
+func testQueryContainingSchemeIsNotTreatedAsAbsoluteForm() {
+    var parser = HttpParser{}
+    parser.init(defaultAllocator)
+
+    var result: HttpRequest;
+    var input = StringInit(
+"GET /auth/callback?state=abc123&iss=https://accounts.google.com&code=4/0ATxyz&scope=email+https://www.googleapis.com/auth/userinfo.email HTTP/1.1\r\nHost: example.com\r\n\r\n"
+)
+    assert(parser.parse(input, &result) == Status.OK)
+    assert(result.path.equals($"/auth/callback"))
+    assert(result.query.equals($"state=abc123&iss=https://accounts.google.com&code=4/0ATxyz&scope=email+https://www.googleapis.com/auth/userinfo.email"))
+}
+
 // Fix A (parser): Connection: keep-alive must set KEEP_ALIVE_REQUESTED flag.
 // HTTP/1.0 clients opt in to keep-alive by sending this header explicitly.
 @test
