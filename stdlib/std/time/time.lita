@@ -122,6 +122,16 @@ public func (this: *DateTime) compare(other: *DateTime) : i32 {
     return (this.toEpochTime() - other.toEpochTime()) as (i32)
 }
 
+// Number of days in the given calendar month (month is 1..12). Walks to the
+// 1st of the next month and steps back one day, so leap years fall out of the
+// normal date normalization rather than a hand-coded table.
+public func DaysInMonth(year: i32, month: i32) : i32 {
+    var firstOfThis = DateTime { .date = Date { .year = year, .month = month as (u8), .day = 1_u8 } }
+    var firstOfNext = firstOfThis.add(1, TimeUnit.MONTHS)
+    var lastOfThis = firstOfNext.minus(1, TimeUnit.DAYS)
+    return lastOfThis.day as (i32)
+}
+
 // Delegates to DateTime.compare (both wrapped at midnight) rather than
 // hand-rolling a year/month/day tuple comparison.
 public func (this: *Date) compare(other: *Date) : i32 {

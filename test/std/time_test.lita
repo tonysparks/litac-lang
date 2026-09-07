@@ -404,3 +404,14 @@ func testFormatExtremeYearDoesNotCrash() {
     var status = dt.isoFormat(sb)
     assert(status == DateTimeStatus.OK || status == DateTimeStatus.INVALID_INPUT_FORMAT)
 }
+
+@test
+func testDaysInMonth() {
+    assert(DaysInMonth(2026, 1) == 31)
+    assert(DaysInMonth(2026, 2) == 28)   // common year
+    assert(DaysInMonth(2024, 2) == 29)   // leap year
+    assert(DaysInMonth(2000, 2) == 29)   // divisible by 400
+    assert(DaysInMonth(1900, 2) == 28)   // divisible by 100, not 400
+    assert(DaysInMonth(2026, 4) == 30)
+    assert(DaysInMonth(2026, 12) == 31)
+}
