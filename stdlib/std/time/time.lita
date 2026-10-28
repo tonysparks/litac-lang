@@ -122,14 +122,20 @@ public func (this: *DateTime) compare(other: *DateTime) : i32 {
     return (this.toEpochTime() - other.toEpochTime()) as (i32)
 }
 
-// Number of days in the given calendar month (month is 1..12). Walks to the
-// 1st of the next month and steps back one day, so leap years fall out of the
-// normal date normalization rather than a hand-coded table.
+// Number of days in the given calendar month (month is 1..12). Pure arithmetic:
+// Windows' _mkgmtime rejects pre-1970 dates, so this can't go through timegm.
 public func DaysInMonth(year: i32, month: i32) : i32 {
-    var firstOfThis = DateTime { .date = Date { .year = year, .month = month as (u8), .day = 1_u8 } }
-    var firstOfNext = firstOfThis.add(1, TimeUnit.MONTHS)
-    var lastOfThis = firstOfNext.minus(1, TimeUnit.DAYS)
-    return lastOfThis.day as (i32)
+    switch(month) {
+        case 2: {
+            var isLeap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+            return isLeap ? 29 : 28
+        }
+        case 4:
+        case 6:
+        case 9:
+        case 11: return 30
+        default: return 31
+    }
 }
 
 // Delegates to DateTime.compare (both wrapped at midnight) rather than
