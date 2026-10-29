@@ -456,6 +456,102 @@
             `
         },
         {
+            "name": "Func type returning func type as variable",
+            "definitions": `
+                func test(i:i32) : i32 {
+                    return i;
+                }
+
+                func x(s: *const char) : func(i32) : i32 {
+                    return &test
+                }
+
+            `,
+            "code": `
+                var t : func(*const char) : func(i32) : i32 = &x;
+                var f = t("x")
+                assert(f(1) == 1)
+            `
+        },
+        {
+            "name": "Typedef func type returning typedef func type",
+            "definitions": `
+                typedef func(i32) : i32 as Inner;
+                typedef func(*const char) : Inner as Outer;
+
+                func test(i:i32) : i32 {
+                    return i;
+                }
+
+                func x(s: *const char) : Inner {
+                    return &test
+                }
+
+                func call(o: Outer) : i32 {
+                    var f = o("x")
+                    return f(2)
+                }
+
+            `,
+            "code": `
+                var t : Outer = &x;
+                assert(t("x")(1) == 1)
+                assert(call(t) == 2)
+            `
+        },
+        {
+            "name": "Cast to func type returning func type",
+            "definitions": `
+                typedef func(i32) : i32 as Inner;
+                typedef func(*const char) : Inner as Outer;
+
+                func test(i:i32) : i32 {
+                    return i;
+                }
+
+                func x(s: *const char) : func(i32) : i32 {
+                    return &test
+                }
+
+                func call(o: Outer) : i32 {
+                    return o("x")(3)
+                }
+
+            `,
+            "code": `
+                assert(call(x as (Outer)) == 3)
+                assert(call(x as (func(*const char) : func(i32) : i32)) == 3)
+            `
+        },
+        {
+            "name": "Func type returning func type as param and struct field",
+            "definitions": `
+                typedef func(i32) : i32 as Inner;
+
+                func test(i:i32) : i32 {
+                    return i;
+                }
+
+                func x(s: *const char) : Inner {
+                    return &test
+                }
+
+                struct Holder {
+                    get: func(*const char) : func(i32) : i32
+                }
+
+                func call(get: func(*const char) : func(i32) : i32) : i32 {
+                    return get("x")(4)
+                }
+
+            `,
+            "code": `
+                var h = Holder { .get = &x }
+                assert(h.get("x")(5) == 5)
+                assert(call(h.get) == 4)
+            `
+        },
+        {
             "name": "Func type in struct",
             "definitions": `
                 func test(i:i32) : i32 {

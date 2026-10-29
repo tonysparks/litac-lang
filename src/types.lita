@@ -773,7 +773,7 @@ public func (this: *TypeInfo) strictEquals(other: *TypeInfo) : bool {
             for(var i = 0; i < thisInfo.paramDecls.size(); i += 1) {
                 var a = thisInfo.paramDecls.get(i)
                 var b = otherInfo.paramDecls.get(i)
-                if(a.strictEquals(b)) {
+                if(!a.strictEquals(b)) {
                     return false;
                 }
             }

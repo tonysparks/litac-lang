@@ -818,8 +818,13 @@ public func (this: using *CGen) cType(type: *TypeInfo,
                 params.appendStrn("...", 3)
             }
 
+            var name = isCast ? "" : this.cTypeName(funcInfo)
+            if(funcInfo.returnType.kind == TypeKind.FUNC_PTR) {
+                return this.cFuncPtrReturningFuncPtr(funcInfo, name, params.cStrConst(), decay)
+            }
+
             sb.append("%s (*%s)(%s)", this.cType(funcInfo.returnType, isCast, decay),
-                isCast ? "" : this.cTypeName(funcInfo), params.cStrConst())
+                name, params.cStrConst())
             return sb.cStrConst()
         }
         default: {
@@ -965,6 +970,10 @@ public func (this: using *CGen) cTypeDecl(type: *TypeInfo,
                 params.appendStrn("...", 3)
             }
 
+            if(funcInfo.returnType.kind == TypeKind.FUNC_PTR) {
+                return this.cFuncPtrReturningFuncPtr(funcInfo, name, params.cStrConst(), decay)
+            }
+
             sb.append("%s (*%s)(%s)", this.cType(funcInfo.returnType, false, decay), name, params.cStrConst())
             return sb.cStrConst()
         }
@@ -976,6 +985,17 @@ public func (this: using *CGen) cTypeDecl(type: *TypeInfo,
             return sb.cStrConst()
         }
     }
+}
+
+// C nests the declarator inside the returned function pointer's type:
+// `R (*(*name)(params))(innerParams)`
+func (this: using *CGen) cFuncPtrReturningFuncPtr(funcInfo: *TypeInfo,
+                                                  name: *const char,
+                                                  params: *const char,
+                                                  decay: bool) : *const char {
+    var declarator = StringBuilderInit(256, this.allocator)
+    declarator.append("(*%s)(%s)", name, params)
+    return this.cTypeDecl(funcInfo.returnType, declarator.cStrConst(), decay)
 }
 
 func (this: using *CGen) foreignName(decl: *Decl, defaultName: String) : String {
