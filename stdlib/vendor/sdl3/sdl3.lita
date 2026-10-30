@@ -1,0 +1,1124 @@
+// SDL3 bindings: the subset needed for a windowed OpenGL game -- init, windows, GL contexts,
+// events, keyboard/mouse/gamepad input, timing and audio streams.
+@include("<SDL3/SDL.h>");
+
+@compiler_option(
+    .os = "mac",
+    .key = "sdl3",
+    .default_path = "/opt/homebrew/opt/sdl3",
+    .options = "-I{path}/include -L{path}/lib -lSDL3"
+);
+
+@compiler_option(
+    .os = "linux",
+    .options = "-lSDL3"
+);
+
+@compiler_option(
+    .os = "windows",
+    .key = "sdl3",
+    .options = "-I{path}/include -L{path}/lib -lSDL3"
+);
+
+//--------------------------------------------------------------------------------------------
+// Types
+//--------------------------------------------------------------------------------------------
+
+@foreign public typedef u32 as SDL_InitFlags;
+@foreign public typedef u64 as SDL_WindowFlags;
+@foreign public typedef u32 as SDL_WindowID;
+@foreign public typedef u32 as SDL_KeyboardID;
+@foreign public typedef u32 as SDL_MouseID;
+@foreign public typedef u32 as SDL_JoystickID;
+@foreign public typedef u32 as SDL_AudioDeviceID;
+@foreign public typedef u32 as SDL_MouseButtonFlags;
+@foreign public typedef u32 as SDL_MessageBoxFlags;
+@foreign public typedef u32 as SDL_EventType;
+@foreign public typedef u32 as SDL_Scancode;
+@foreign public typedef u32 as SDL_Keycode;
+@foreign public typedef u16 as SDL_Keymod;
+@foreign public typedef u32 as SDL_MouseWheelDirection;
+@foreign public typedef i32 as SDL_GLAttr;
+@foreign public typedef u32 as SDL_GLProfile;
+@foreign public typedef u32 as SDL_GLContextFlag;
+@foreign public typedef u32 as SDL_AudioFormat;
+@foreign public typedef i32 as SDL_GamepadAxis;
+@foreign public typedef i32 as SDL_GamepadButton;
+
+@foreign public struct SDL_Window {}
+@foreign public typedef *void as SDL_GLContext;
+@foreign public struct SDL_AudioStream {}
+@foreign public struct SDL_Gamepad {}
+
+@foreign public typedef func() : void as SDL_FunctionPointer;
+@foreign public typedef func(*void, *SDL_AudioStream, i32, i32) : void as SDL_AudioStreamCallback;
+
+@foreign public struct SDL_AudioSpec {
+    format: SDL_AudioFormat
+    channels: i32
+    freq: i32
+}
+
+//--------------------------------------------------------------------------------------------
+// Events -- only the commonly used members of SDL_Event are declared; the C union is authoritative.
+//--------------------------------------------------------------------------------------------
+
+@foreign public struct SDL_CommonEvent {
+    type: u32
+    reserved: u32
+    timestamp: u64
+}
+
+@foreign public struct SDL_WindowEvent {
+    type: SDL_EventType
+    reserved: u32
+    timestamp: u64
+    windowID: SDL_WindowID
+    data1: i32
+    data2: i32
+}
+
+@foreign public struct SDL_KeyboardEvent {
+    type: SDL_EventType
+    reserved: u32
+    timestamp: u64
+    windowID: SDL_WindowID
+    which: SDL_KeyboardID
+    scancode: SDL_Scancode
+    key: SDL_Keycode
+    mod: SDL_Keymod
+    raw: u16
+    down: bool
+    repeat: bool
+}
+
+@foreign public struct SDL_TextInputEvent {
+    type: SDL_EventType
+    reserved: u32
+    timestamp: u64
+    windowID: SDL_WindowID
+    text: *const char
+}
+
+@foreign public struct SDL_MouseMotionEvent {
+    type: SDL_EventType
+    reserved: u32
+    timestamp: u64
+    windowID: SDL_WindowID
+    which: SDL_MouseID
+    state: SDL_MouseButtonFlags
+    x: f32
+    y: f32
+    xrel: f32
+    yrel: f32
+}
+
+@foreign public struct SDL_MouseButtonEvent {
+    type: SDL_EventType
+    reserved: u32
+    timestamp: u64
+    windowID: SDL_WindowID
+    which: SDL_MouseID
+    button: u8
+    down: bool
+    clicks: u8
+    padding: u8
+    x: f32
+    y: f32
+}
+
+@foreign public struct SDL_MouseWheelEvent {
+    type: SDL_EventType
+    reserved: u32
+    timestamp: u64
+    windowID: SDL_WindowID
+    which: SDL_MouseID
+    x: f32
+    y: f32
+    direction: SDL_MouseWheelDirection
+    mouse_x: f32
+    mouse_y: f32
+    integer_x: i32
+    integer_y: i32
+}
+
+@foreign public struct SDL_GamepadDeviceEvent {
+    type: SDL_EventType
+    reserved: u32
+    timestamp: u64
+    which: SDL_JoystickID
+}
+
+@foreign public struct SDL_GamepadAxisEvent {
+    type: SDL_EventType
+    reserved: u32
+    timestamp: u64
+    which: SDL_JoystickID
+    axis: u8
+    padding1: u8
+    padding2: u8
+    padding3: u8
+    value: i16
+    padding4: u16
+}
+
+@foreign public struct SDL_GamepadButtonEvent {
+    type: SDL_EventType
+    reserved: u32
+    timestamp: u64
+    which: SDL_JoystickID
+    button: u8
+    down: bool
+    padding1: u8
+    padding2: u8
+}
+
+@foreign public struct SDL_QuitEvent {
+    type: SDL_EventType
+    reserved: u32
+    timestamp: u64
+}
+
+@foreign public union SDL_Event {
+    type: u32
+    common: SDL_CommonEvent
+    window: SDL_WindowEvent
+    key: SDL_KeyboardEvent
+    text: SDL_TextInputEvent
+    motion: SDL_MouseMotionEvent
+    button: SDL_MouseButtonEvent
+    wheel: SDL_MouseWheelEvent
+    gdevice: SDL_GamepadDeviceEvent
+    gaxis: SDL_GamepadAxisEvent
+    gbutton: SDL_GamepadButtonEvent
+    quit: SDL_QuitEvent
+    padding: [128]u8
+}
+
+//--------------------------------------------------------------------------------------------
+// Init / errors / misc
+//--------------------------------------------------------------------------------------------
+
+@foreign public const SDL_INIT_AUDIO: SDL_InitFlags;
+@foreign public const SDL_INIT_VIDEO: SDL_InitFlags;
+@foreign public const SDL_INIT_JOYSTICK: SDL_InitFlags;
+@foreign public const SDL_INIT_HAPTIC: SDL_InitFlags;
+@foreign public const SDL_INIT_GAMEPAD: SDL_InitFlags;
+@foreign public const SDL_INIT_EVENTS: SDL_InitFlags;
+
+@foreign public func SDL_Init(flags: SDL_InitFlags) : bool;
+@foreign public func SDL_InitSubSystem(flags: SDL_InitFlags) : bool;
+@foreign public func SDL_QuitSubSystem(flags: SDL_InitFlags);
+@foreign public func SDL_Quit();
+
+@foreign public func SDL_GetError() : *const char;
+@foreign public func SDL_ClearError() : bool;
+@foreign public func SDL_GetVersion() : i32;
+@foreign public func SDL_SetHint(name: *const char, value: *const char) : bool;
+@foreign public func SDL_free(mem: *void);
+
+// Directory of the running executable (with trailing separator); owned by SDL, do not free.
+@foreign public func SDL_GetBasePath() : *const char;
+
+@foreign public const SDL_MESSAGEBOX_ERROR: SDL_MessageBoxFlags;
+@foreign public const SDL_MESSAGEBOX_WARNING: SDL_MessageBoxFlags;
+@foreign public const SDL_MESSAGEBOX_INFORMATION: SDL_MessageBoxFlags;
+@foreign public func SDL_ShowSimpleMessageBox(flags: SDL_MessageBoxFlags, title: *const char, message: *const char, window: *SDL_Window) : bool;
+
+//--------------------------------------------------------------------------------------------
+// Windows
+//--------------------------------------------------------------------------------------------
+
+@foreign public const SDL_WINDOW_FULLSCREEN: SDL_WindowFlags;
+@foreign public const SDL_WINDOW_OPENGL: SDL_WindowFlags;
+@foreign public const SDL_WINDOW_HIDDEN: SDL_WindowFlags;
+@foreign public const SDL_WINDOW_BORDERLESS: SDL_WindowFlags;
+@foreign public const SDL_WINDOW_RESIZABLE: SDL_WindowFlags;
+@foreign public const SDL_WINDOW_MINIMIZED: SDL_WindowFlags;
+@foreign public const SDL_WINDOW_MAXIMIZED: SDL_WindowFlags;
+@foreign public const SDL_WINDOW_MOUSE_GRABBED: SDL_WindowFlags;
+@foreign public const SDL_WINDOW_INPUT_FOCUS: SDL_WindowFlags;
+@foreign public const SDL_WINDOW_MOUSE_FOCUS: SDL_WindowFlags;
+@foreign public const SDL_WINDOW_HIGH_PIXEL_DENSITY: SDL_WindowFlags;
+@foreign public const SDL_WINDOW_MOUSE_RELATIVE_MODE: SDL_WindowFlags;
+
+@foreign public const SDL_WINDOWPOS_CENTERED: i32;
+@foreign public const SDL_WINDOWPOS_UNDEFINED: i32;
+
+@foreign public func SDL_CreateWindow(title: *const char, w: i32, h: i32, flags: SDL_WindowFlags) : *SDL_Window;
+@foreign public func SDL_DestroyWindow(window: *SDL_Window);
+@foreign public func SDL_GetWindowID(window: *SDL_Window) : SDL_WindowID;
+@foreign public func SDL_GetWindowFlags(window: *SDL_Window) : SDL_WindowFlags;
+@foreign public func SDL_SetWindowTitle(window: *SDL_Window, title: *const char) : bool;
+@foreign public func SDL_GetWindowSize(window: *SDL_Window, w: *i32, h: *i32) : bool;
+@foreign public func SDL_SetWindowSize(window: *SDL_Window, w: i32, h: i32) : bool;
+@foreign public func SDL_GetWindowSizeInPixels(window: *SDL_Window, w: *i32, h: *i32) : bool;
+@foreign public func SDL_SetWindowPosition(window: *SDL_Window, x: i32, y: i32) : bool;
+@foreign public func SDL_SetWindowFullscreen(window: *SDL_Window, fullscreen: bool) : bool;
+@foreign public func SDL_ShowWindow(window: *SDL_Window) : bool;
+@foreign public func SDL_HideWindow(window: *SDL_Window) : bool;
+@foreign public func SDL_RaiseWindow(window: *SDL_Window) : bool;
+
+// Ratio of pixels to window coordinates (2.0 on a Retina display).
+@foreign public func SDL_GetWindowPixelDensity(window: *SDL_Window) : f32;
+@foreign public func SDL_GetWindowDisplayScale(window: *SDL_Window) : f32;
+
+//--------------------------------------------------------------------------------------------
+// OpenGL
+//--------------------------------------------------------------------------------------------
+
+@foreign public const SDL_GL_RED_SIZE: SDL_GLAttr;
+@foreign public const SDL_GL_GREEN_SIZE: SDL_GLAttr;
+@foreign public const SDL_GL_BLUE_SIZE: SDL_GLAttr;
+@foreign public const SDL_GL_ALPHA_SIZE: SDL_GLAttr;
+@foreign public const SDL_GL_DOUBLEBUFFER: SDL_GLAttr;
+@foreign public const SDL_GL_DEPTH_SIZE: SDL_GLAttr;
+@foreign public const SDL_GL_STENCIL_SIZE: SDL_GLAttr;
+@foreign public const SDL_GL_MULTISAMPLEBUFFERS: SDL_GLAttr;
+@foreign public const SDL_GL_MULTISAMPLESAMPLES: SDL_GLAttr;
+@foreign public const SDL_GL_ACCELERATED_VISUAL: SDL_GLAttr;
+@foreign public const SDL_GL_CONTEXT_MAJOR_VERSION: SDL_GLAttr;
+@foreign public const SDL_GL_CONTEXT_MINOR_VERSION: SDL_GLAttr;
+@foreign public const SDL_GL_CONTEXT_FLAGS: SDL_GLAttr;
+@foreign public const SDL_GL_CONTEXT_PROFILE_MASK: SDL_GLAttr;
+@foreign public const SDL_GL_FRAMEBUFFER_SRGB_CAPABLE: SDL_GLAttr;
+
+@foreign public const SDL_GL_CONTEXT_PROFILE_CORE: SDL_GLProfile;
+@foreign public const SDL_GL_CONTEXT_PROFILE_COMPATIBILITY: SDL_GLProfile;
+
+@foreign public const SDL_GL_CONTEXT_DEBUG_FLAG: SDL_GLContextFlag;
+@foreign public const SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG: SDL_GLContextFlag;
+
+@foreign public func SDL_GL_SetAttribute(attr: SDL_GLAttr, value: i32) : bool;
+@foreign public func SDL_GL_GetAttribute(attr: SDL_GLAttr, value: *i32) : bool;
+@foreign public func SDL_GL_CreateContext(window: *SDL_Window) : SDL_GLContext;
+@foreign public func SDL_GL_DestroyContext(context: SDL_GLContext) : bool;
+@foreign public func SDL_GL_MakeCurrent(window: *SDL_Window, context: SDL_GLContext) : bool;
+@foreign public func SDL_GL_SwapWindow(window: *SDL_Window) : bool;
+
+// 0 = immediate, 1 = vsync, -1 = adaptive vsync
+@foreign public func SDL_GL_SetSwapInterval(interval: i32) : bool;
+@foreign public func SDL_GL_GetSwapInterval(interval: *i32) : bool;
+@foreign public func SDL_GL_GetProcAddress(proc: *const char) : SDL_FunctionPointer;
+
+//--------------------------------------------------------------------------------------------
+// Events
+//--------------------------------------------------------------------------------------------
+
+@foreign public func SDL_PollEvent(event: *SDL_Event) : bool;
+@foreign public func SDL_WaitEvent(event: *SDL_Event) : bool;
+@foreign public func SDL_WaitEventTimeout(event: *SDL_Event, timeoutMS: i32) : bool;
+@foreign public func SDL_PumpEvents();
+@foreign public func SDL_FlushEvents(minType: u32, maxType: u32);
+
+//--------------------------------------------------------------------------------------------
+// Keyboard
+//--------------------------------------------------------------------------------------------
+
+// Indexed by SDL_Scancode; valid for the lifetime of the app, updated by SDL_PumpEvents/PollEvent.
+@foreign public func SDL_GetKeyboardState(numkeys: *i32) : *const bool;
+@foreign public func SDL_GetModState() : SDL_Keymod;
+@foreign public func SDL_GetKeyName(key: SDL_Keycode) : *const char;
+@foreign public func SDL_GetScancodeName(scancode: SDL_Scancode) : *const char;
+@foreign public func SDL_GetKeyFromScancode(scancode: SDL_Scancode, modstate: SDL_Keymod, keyEvent: bool) : SDL_Keycode;
+@foreign public func SDL_GetScancodeFromKey(key: SDL_Keycode, modstate: *SDL_Keymod) : SDL_Scancode;
+@foreign public func SDL_StartTextInput(window: *SDL_Window) : bool;
+@foreign public func SDL_StopTextInput(window: *SDL_Window) : bool;
+@foreign public func SDL_TextInputActive(window: *SDL_Window) : bool;
+
+//--------------------------------------------------------------------------------------------
+// Mouse
+//--------------------------------------------------------------------------------------------
+
+@foreign public const SDL_BUTTON_LEFT: u8;
+@foreign public const SDL_BUTTON_MIDDLE: u8;
+@foreign public const SDL_BUTTON_RIGHT: u8;
+@foreign public const SDL_BUTTON_X1: u8;
+@foreign public const SDL_BUTTON_X2: u8;
+
+@foreign public const SDL_BUTTON_LMASK: SDL_MouseButtonFlags;
+@foreign public const SDL_BUTTON_MMASK: SDL_MouseButtonFlags;
+@foreign public const SDL_BUTTON_RMASK: SDL_MouseButtonFlags;
+@foreign public const SDL_BUTTON_X1MASK: SDL_MouseButtonFlags;
+@foreign public const SDL_BUTTON_X2MASK: SDL_MouseButtonFlags;
+
+// Relative mode hides the cursor and reports unbounded raw deltas -- what mouse-look wants.
+@foreign public func SDL_SetWindowRelativeMouseMode(window: *SDL_Window, enabled: bool) : bool;
+@foreign public func SDL_GetWindowRelativeMouseMode(window: *SDL_Window) : bool;
+@foreign public func SDL_SetWindowMouseGrab(window: *SDL_Window, grabbed: bool) : bool;
+@foreign public func SDL_GetMouseState(x: *f32, y: *f32) : SDL_MouseButtonFlags;
+@foreign public func SDL_GetRelativeMouseState(x: *f32, y: *f32) : SDL_MouseButtonFlags;
+@foreign public func SDL_WarpMouseInWindow(window: *SDL_Window, x: f32, y: f32);
+@foreign public func SDL_ShowCursor() : bool;
+@foreign public func SDL_HideCursor() : bool;
+
+//--------------------------------------------------------------------------------------------
+// Gamepad
+//--------------------------------------------------------------------------------------------
+
+// Returned array must be released with SDL_free.
+@foreign public func SDL_GetGamepads(count: *i32) : *SDL_JoystickID;
+@foreign public func SDL_IsGamepad(instanceId: SDL_JoystickID) : bool;
+@foreign public func SDL_OpenGamepad(instanceId: SDL_JoystickID) : *SDL_Gamepad;
+@foreign public func SDL_CloseGamepad(gamepad: *SDL_Gamepad);
+@foreign public func SDL_GetGamepadName(gamepad: *SDL_Gamepad) : *const char;
+@foreign public func SDL_GetGamepadAxis(gamepad: *SDL_Gamepad, axis: SDL_GamepadAxis) : i16;
+@foreign public func SDL_GetGamepadButton(gamepad: *SDL_Gamepad, button: SDL_GamepadButton) : bool;
+@foreign public func SDL_RumbleGamepad(gamepad: *SDL_Gamepad, lowFrequency: u16, highFrequency: u16, durationMS: u32) : bool;
+
+//--------------------------------------------------------------------------------------------
+// Timing
+//--------------------------------------------------------------------------------------------
+
+@foreign public func SDL_GetTicks() : u64;
+@foreign public func SDL_GetTicksNS() : u64;
+@foreign public func SDL_GetPerformanceCounter() : u64;
+@foreign public func SDL_GetPerformanceFrequency() : u64;
+@foreign public func SDL_Delay(ms: u32);
+@foreign public func SDL_DelayNS(ns: u64);
+
+//--------------------------------------------------------------------------------------------
+// Audio
+//--------------------------------------------------------------------------------------------
+
+@foreign public const SDL_AUDIO_U8: SDL_AudioFormat;
+@foreign public const SDL_AUDIO_S8: SDL_AudioFormat;
+@foreign public const SDL_AUDIO_S16: SDL_AudioFormat;
+@foreign public const SDL_AUDIO_S32: SDL_AudioFormat;
+@foreign public const SDL_AUDIO_F32: SDL_AudioFormat;
+
+@foreign public const SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK: SDL_AudioDeviceID;
+@foreign public const SDL_AUDIO_DEVICE_DEFAULT_RECORDING: SDL_AudioDeviceID;
+
+@foreign public func SDL_OpenAudioDevice(devid: SDL_AudioDeviceID, spec: *const SDL_AudioSpec) : SDL_AudioDeviceID;
+@foreign public func SDL_CloseAudioDevice(devid: SDL_AudioDeviceID);
+@foreign public func SDL_PauseAudioDevice(devid: SDL_AudioDeviceID) : bool;
+@foreign public func SDL_ResumeAudioDevice(devid: SDL_AudioDeviceID) : bool;
+@foreign public func SDL_GetAudioDeviceFormat(devid: SDL_AudioDeviceID, spec: *SDL_AudioSpec, sampleFrames: *i32) : bool;
+
+// Opens a device and a bound stream in one call; the device starts paused (see SDL_ResumeAudioStreamDevice).
+@foreign public func SDL_OpenAudioDeviceStream(devid: SDL_AudioDeviceID, spec: *const SDL_AudioSpec, callback: SDL_AudioStreamCallback, userdata: *void) : *SDL_AudioStream;
+@foreign public func SDL_CreateAudioStream(srcSpec: *const SDL_AudioSpec, dstSpec: *const SDL_AudioSpec) : *SDL_AudioStream;
+@foreign public func SDL_BindAudioStream(devid: SDL_AudioDeviceID, stream: *SDL_AudioStream) : bool;
+@foreign public func SDL_UnbindAudioStream(stream: *SDL_AudioStream);
+@foreign public func SDL_DestroyAudioStream(stream: *SDL_AudioStream);
+@foreign public func SDL_GetAudioStreamDevice(stream: *SDL_AudioStream) : SDL_AudioDeviceID;
+@foreign public func SDL_ResumeAudioStreamDevice(stream: *SDL_AudioStream) : bool;
+@foreign public func SDL_PauseAudioStreamDevice(stream: *SDL_AudioStream) : bool;
+@foreign public func SDL_PutAudioStreamData(stream: *SDL_AudioStream, buf: *const void, len: i32) : bool;
+@foreign public func SDL_GetAudioStreamData(stream: *SDL_AudioStream, buf: *void, len: i32) : i32;
+@foreign public func SDL_GetAudioStreamQueued(stream: *SDL_AudioStream) : i32;
+@foreign public func SDL_GetAudioStreamAvailable(stream: *SDL_AudioStream) : i32;
+@foreign public func SDL_FlushAudioStream(stream: *SDL_AudioStream) : bool;
+@foreign public func SDL_ClearAudioStream(stream: *SDL_AudioStream) : bool;
+@foreign public func SDL_SetAudioStreamGain(stream: *SDL_AudioStream, gain: f32) : bool;
+@foreign public func SDL_SetAudioStreamFrequencyRatio(stream: *SDL_AudioStream, ratio: f32) : bool;
+
+// audioBuf is allocated by SDL and must be released with SDL_free.
+@foreign public func SDL_LoadWAV(path: *const char, spec: *SDL_AudioSpec, audioBuf: **u8, audioLen: *u32) : bool;
+@foreign public func SDL_ConvertAudioSamples(srcSpec: *const SDL_AudioSpec, srcData: *const u8, srcLen: i32, dstSpec: *const SDL_AudioSpec, dstData: **u8, dstLen: *i32) : bool;
+@foreign public func SDL_MixAudio(dst: *u8, src: *const u8, format: SDL_AudioFormat, len: u32, volume: f32) : bool;
+
+//--------------------------------------------------------------------------------------------
+// Constants (generated from the SDL3 headers)
+//--------------------------------------------------------------------------------------------
+
+// Event types
+@foreign public const SDL_EVENT_FIRST: SDL_EventType;
+@foreign public const SDL_EVENT_QUIT: SDL_EventType;
+@foreign public const SDL_EVENT_TERMINATING: SDL_EventType;
+@foreign public const SDL_EVENT_LOW_MEMORY: SDL_EventType;
+@foreign public const SDL_EVENT_WILL_ENTER_BACKGROUND: SDL_EventType;
+@foreign public const SDL_EVENT_DID_ENTER_BACKGROUND: SDL_EventType;
+@foreign public const SDL_EVENT_WILL_ENTER_FOREGROUND: SDL_EventType;
+@foreign public const SDL_EVENT_DID_ENTER_FOREGROUND: SDL_EventType;
+@foreign public const SDL_EVENT_LOCALE_CHANGED: SDL_EventType;
+@foreign public const SDL_EVENT_SYSTEM_THEME_CHANGED: SDL_EventType;
+@foreign public const SDL_EVENT_DISPLAY_ORIENTATION: SDL_EventType;
+@foreign public const SDL_EVENT_DISPLAY_ADDED: SDL_EventType;
+@foreign public const SDL_EVENT_DISPLAY_REMOVED: SDL_EventType;
+@foreign public const SDL_EVENT_DISPLAY_MOVED: SDL_EventType;
+@foreign public const SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED: SDL_EventType;
+@foreign public const SDL_EVENT_DISPLAY_CURRENT_MODE_CHANGED: SDL_EventType;
+@foreign public const SDL_EVENT_DISPLAY_CONTENT_SCALE_CHANGED: SDL_EventType;
+@foreign public const SDL_EVENT_DISPLAY_USABLE_BOUNDS_CHANGED: SDL_EventType;
+@foreign public const SDL_EVENT_DISPLAY_FIRST: SDL_EventType;
+@foreign public const SDL_EVENT_DISPLAY_LAST: SDL_EventType;
+@foreign public const SDL_EVENT_WINDOW_SHOWN: SDL_EventType;
+@foreign public const SDL_EVENT_WINDOW_HIDDEN: SDL_EventType;
+@foreign public const SDL_EVENT_WINDOW_EXPOSED: SDL_EventType;
+@foreign public const SDL_EVENT_WINDOW_MOVED: SDL_EventType;
+@foreign public const SDL_EVENT_WINDOW_RESIZED: SDL_EventType;
+@foreign public const SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED: SDL_EventType;
+@foreign public const SDL_EVENT_WINDOW_METAL_VIEW_RESIZED: SDL_EventType;
+@foreign public const SDL_EVENT_WINDOW_MINIMIZED: SDL_EventType;
+@foreign public const SDL_EVENT_WINDOW_MAXIMIZED: SDL_EventType;
+@foreign public const SDL_EVENT_WINDOW_RESTORED: SDL_EventType;
+@foreign public const SDL_EVENT_WINDOW_MOUSE_ENTER: SDL_EventType;
+@foreign public const SDL_EVENT_WINDOW_MOUSE_LEAVE: SDL_EventType;
+@foreign public const SDL_EVENT_WINDOW_FOCUS_GAINED: SDL_EventType;
+@foreign public const SDL_EVENT_WINDOW_FOCUS_LOST: SDL_EventType;
+@foreign public const SDL_EVENT_WINDOW_CLOSE_REQUESTED: SDL_EventType;
+@foreign public const SDL_EVENT_WINDOW_HIT_TEST: SDL_EventType;
+@foreign public const SDL_EVENT_WINDOW_ICCPROF_CHANGED: SDL_EventType;
+@foreign public const SDL_EVENT_WINDOW_DISPLAY_CHANGED: SDL_EventType;
+@foreign public const SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED: SDL_EventType;
+@foreign public const SDL_EVENT_WINDOW_SAFE_AREA_CHANGED: SDL_EventType;
+@foreign public const SDL_EVENT_WINDOW_OCCLUDED: SDL_EventType;
+@foreign public const SDL_EVENT_WINDOW_ENTER_FULLSCREEN: SDL_EventType;
+@foreign public const SDL_EVENT_WINDOW_LEAVE_FULLSCREEN: SDL_EventType;
+@foreign public const SDL_EVENT_WINDOW_DESTROYED: SDL_EventType;
+@foreign public const SDL_EVENT_WINDOW_HDR_STATE_CHANGED: SDL_EventType;
+@foreign public const SDL_EVENT_WINDOW_FIRST: SDL_EventType;
+@foreign public const SDL_EVENT_WINDOW_LAST: SDL_EventType;
+@foreign public const SDL_EVENT_KEY_DOWN: SDL_EventType;
+@foreign public const SDL_EVENT_KEY_UP: SDL_EventType;
+@foreign public const SDL_EVENT_TEXT_EDITING: SDL_EventType;
+@foreign public const SDL_EVENT_TEXT_INPUT: SDL_EventType;
+@foreign public const SDL_EVENT_KEYMAP_CHANGED: SDL_EventType;
+@foreign public const SDL_EVENT_KEYBOARD_ADDED: SDL_EventType;
+@foreign public const SDL_EVENT_KEYBOARD_REMOVED: SDL_EventType;
+@foreign public const SDL_EVENT_TEXT_EDITING_CANDIDATES: SDL_EventType;
+@foreign public const SDL_EVENT_SCREEN_KEYBOARD_SHOWN: SDL_EventType;
+@foreign public const SDL_EVENT_SCREEN_KEYBOARD_HIDDEN: SDL_EventType;
+@foreign public const SDL_EVENT_MOUSE_MOTION: SDL_EventType;
+@foreign public const SDL_EVENT_MOUSE_BUTTON_DOWN: SDL_EventType;
+@foreign public const SDL_EVENT_MOUSE_BUTTON_UP: SDL_EventType;
+@foreign public const SDL_EVENT_MOUSE_WHEEL: SDL_EventType;
+@foreign public const SDL_EVENT_MOUSE_ADDED: SDL_EventType;
+@foreign public const SDL_EVENT_MOUSE_REMOVED: SDL_EventType;
+@foreign public const SDL_EVENT_JOYSTICK_AXIS_MOTION: SDL_EventType;
+@foreign public const SDL_EVENT_JOYSTICK_BALL_MOTION: SDL_EventType;
+@foreign public const SDL_EVENT_JOYSTICK_HAT_MOTION: SDL_EventType;
+@foreign public const SDL_EVENT_JOYSTICK_BUTTON_DOWN: SDL_EventType;
+@foreign public const SDL_EVENT_JOYSTICK_BUTTON_UP: SDL_EventType;
+@foreign public const SDL_EVENT_JOYSTICK_ADDED: SDL_EventType;
+@foreign public const SDL_EVENT_JOYSTICK_REMOVED: SDL_EventType;
+@foreign public const SDL_EVENT_JOYSTICK_BATTERY_UPDATED: SDL_EventType;
+@foreign public const SDL_EVENT_JOYSTICK_UPDATE_COMPLETE: SDL_EventType;
+@foreign public const SDL_EVENT_GAMEPAD_AXIS_MOTION: SDL_EventType;
+@foreign public const SDL_EVENT_GAMEPAD_BUTTON_DOWN: SDL_EventType;
+@foreign public const SDL_EVENT_GAMEPAD_BUTTON_UP: SDL_EventType;
+@foreign public const SDL_EVENT_GAMEPAD_ADDED: SDL_EventType;
+@foreign public const SDL_EVENT_GAMEPAD_REMOVED: SDL_EventType;
+@foreign public const SDL_EVENT_GAMEPAD_REMAPPED: SDL_EventType;
+@foreign public const SDL_EVENT_GAMEPAD_TOUCHPAD_DOWN: SDL_EventType;
+@foreign public const SDL_EVENT_GAMEPAD_TOUCHPAD_MOTION: SDL_EventType;
+@foreign public const SDL_EVENT_GAMEPAD_TOUCHPAD_UP: SDL_EventType;
+@foreign public const SDL_EVENT_GAMEPAD_SENSOR_UPDATE: SDL_EventType;
+@foreign public const SDL_EVENT_GAMEPAD_UPDATE_COMPLETE: SDL_EventType;
+@foreign public const SDL_EVENT_GAMEPAD_STEAM_HANDLE_UPDATED: SDL_EventType;
+@foreign public const SDL_EVENT_FINGER_DOWN: SDL_EventType;
+@foreign public const SDL_EVENT_FINGER_UP: SDL_EventType;
+@foreign public const SDL_EVENT_FINGER_MOTION: SDL_EventType;
+@foreign public const SDL_EVENT_FINGER_CANCELED: SDL_EventType;
+@foreign public const SDL_EVENT_PINCH_BEGIN: SDL_EventType;
+@foreign public const SDL_EVENT_PINCH_UPDATE: SDL_EventType;
+@foreign public const SDL_EVENT_PINCH_END: SDL_EventType;
+@foreign public const SDL_EVENT_CLIPBOARD_UPDATE: SDL_EventType;
+@foreign public const SDL_EVENT_DROP_FILE: SDL_EventType;
+@foreign public const SDL_EVENT_DROP_TEXT: SDL_EventType;
+@foreign public const SDL_EVENT_DROP_BEGIN: SDL_EventType;
+@foreign public const SDL_EVENT_DROP_COMPLETE: SDL_EventType;
+@foreign public const SDL_EVENT_DROP_POSITION: SDL_EventType;
+@foreign public const SDL_EVENT_AUDIO_DEVICE_ADDED: SDL_EventType;
+@foreign public const SDL_EVENT_AUDIO_DEVICE_REMOVED: SDL_EventType;
+@foreign public const SDL_EVENT_AUDIO_DEVICE_FORMAT_CHANGED: SDL_EventType;
+@foreign public const SDL_EVENT_SENSOR_UPDATE: SDL_EventType;
+@foreign public const SDL_EVENT_PEN_PROXIMITY_IN: SDL_EventType;
+@foreign public const SDL_EVENT_PEN_PROXIMITY_OUT: SDL_EventType;
+@foreign public const SDL_EVENT_PEN_DOWN: SDL_EventType;
+@foreign public const SDL_EVENT_PEN_UP: SDL_EventType;
+@foreign public const SDL_EVENT_PEN_BUTTON_DOWN: SDL_EventType;
+@foreign public const SDL_EVENT_PEN_BUTTON_UP: SDL_EventType;
+@foreign public const SDL_EVENT_PEN_MOTION: SDL_EventType;
+@foreign public const SDL_EVENT_PEN_AXIS: SDL_EventType;
+@foreign public const SDL_EVENT_CAMERA_DEVICE_ADDED: SDL_EventType;
+@foreign public const SDL_EVENT_CAMERA_DEVICE_REMOVED: SDL_EventType;
+@foreign public const SDL_EVENT_CAMERA_DEVICE_APPROVED: SDL_EventType;
+@foreign public const SDL_EVENT_CAMERA_DEVICE_DENIED: SDL_EventType;
+@foreign public const SDL_EVENT_RENDER_TARGETS_RESET: SDL_EventType;
+@foreign public const SDL_EVENT_RENDER_DEVICE_RESET: SDL_EventType;
+@foreign public const SDL_EVENT_RENDER_DEVICE_LOST: SDL_EventType;
+@foreign public const SDL_EVENT_PRIVATE0: SDL_EventType;
+@foreign public const SDL_EVENT_PRIVATE1: SDL_EventType;
+@foreign public const SDL_EVENT_PRIVATE2: SDL_EventType;
+@foreign public const SDL_EVENT_PRIVATE3: SDL_EventType;
+@foreign public const SDL_EVENT_POLL_SENTINEL: SDL_EventType;
+@foreign public const SDL_EVENT_USER: SDL_EventType;
+@foreign public const SDL_EVENT_LAST: SDL_EventType;
+@foreign public const SDL_EVENT_ENUM_PADDING: SDL_EventType;
+
+// Scancodes
+@foreign public const SDL_SCANCODE_UNKNOWN: SDL_Scancode;
+@foreign public const SDL_SCANCODE_A: SDL_Scancode;
+@foreign public const SDL_SCANCODE_B: SDL_Scancode;
+@foreign public const SDL_SCANCODE_C: SDL_Scancode;
+@foreign public const SDL_SCANCODE_D: SDL_Scancode;
+@foreign public const SDL_SCANCODE_E: SDL_Scancode;
+@foreign public const SDL_SCANCODE_F: SDL_Scancode;
+@foreign public const SDL_SCANCODE_G: SDL_Scancode;
+@foreign public const SDL_SCANCODE_H: SDL_Scancode;
+@foreign public const SDL_SCANCODE_I: SDL_Scancode;
+@foreign public const SDL_SCANCODE_J: SDL_Scancode;
+@foreign public const SDL_SCANCODE_K: SDL_Scancode;
+@foreign public const SDL_SCANCODE_L: SDL_Scancode;
+@foreign public const SDL_SCANCODE_M: SDL_Scancode;
+@foreign public const SDL_SCANCODE_N: SDL_Scancode;
+@foreign public const SDL_SCANCODE_O: SDL_Scancode;
+@foreign public const SDL_SCANCODE_P: SDL_Scancode;
+@foreign public const SDL_SCANCODE_Q: SDL_Scancode;
+@foreign public const SDL_SCANCODE_R: SDL_Scancode;
+@foreign public const SDL_SCANCODE_S: SDL_Scancode;
+@foreign public const SDL_SCANCODE_T: SDL_Scancode;
+@foreign public const SDL_SCANCODE_U: SDL_Scancode;
+@foreign public const SDL_SCANCODE_V: SDL_Scancode;
+@foreign public const SDL_SCANCODE_W: SDL_Scancode;
+@foreign public const SDL_SCANCODE_X: SDL_Scancode;
+@foreign public const SDL_SCANCODE_Y: SDL_Scancode;
+@foreign public const SDL_SCANCODE_Z: SDL_Scancode;
+@foreign public const SDL_SCANCODE_1: SDL_Scancode;
+@foreign public const SDL_SCANCODE_2: SDL_Scancode;
+@foreign public const SDL_SCANCODE_3: SDL_Scancode;
+@foreign public const SDL_SCANCODE_4: SDL_Scancode;
+@foreign public const SDL_SCANCODE_5: SDL_Scancode;
+@foreign public const SDL_SCANCODE_6: SDL_Scancode;
+@foreign public const SDL_SCANCODE_7: SDL_Scancode;
+@foreign public const SDL_SCANCODE_8: SDL_Scancode;
+@foreign public const SDL_SCANCODE_9: SDL_Scancode;
+@foreign public const SDL_SCANCODE_0: SDL_Scancode;
+@foreign public const SDL_SCANCODE_RETURN: SDL_Scancode;
+@foreign public const SDL_SCANCODE_ESCAPE: SDL_Scancode;
+@foreign public const SDL_SCANCODE_BACKSPACE: SDL_Scancode;
+@foreign public const SDL_SCANCODE_TAB: SDL_Scancode;
+@foreign public const SDL_SCANCODE_SPACE: SDL_Scancode;
+@foreign public const SDL_SCANCODE_MINUS: SDL_Scancode;
+@foreign public const SDL_SCANCODE_EQUALS: SDL_Scancode;
+@foreign public const SDL_SCANCODE_LEFTBRACKET: SDL_Scancode;
+@foreign public const SDL_SCANCODE_RIGHTBRACKET: SDL_Scancode;
+@foreign public const SDL_SCANCODE_BACKSLASH: SDL_Scancode;
+@foreign public const SDL_SCANCODE_NONUSHASH: SDL_Scancode;
+@foreign public const SDL_SCANCODE_SEMICOLON: SDL_Scancode;
+@foreign public const SDL_SCANCODE_APOSTROPHE: SDL_Scancode;
+@foreign public const SDL_SCANCODE_GRAVE: SDL_Scancode;
+@foreign public const SDL_SCANCODE_COMMA: SDL_Scancode;
+@foreign public const SDL_SCANCODE_PERIOD: SDL_Scancode;
+@foreign public const SDL_SCANCODE_SLASH: SDL_Scancode;
+@foreign public const SDL_SCANCODE_CAPSLOCK: SDL_Scancode;
+@foreign public const SDL_SCANCODE_F1: SDL_Scancode;
+@foreign public const SDL_SCANCODE_F2: SDL_Scancode;
+@foreign public const SDL_SCANCODE_F3: SDL_Scancode;
+@foreign public const SDL_SCANCODE_F4: SDL_Scancode;
+@foreign public const SDL_SCANCODE_F5: SDL_Scancode;
+@foreign public const SDL_SCANCODE_F6: SDL_Scancode;
+@foreign public const SDL_SCANCODE_F7: SDL_Scancode;
+@foreign public const SDL_SCANCODE_F8: SDL_Scancode;
+@foreign public const SDL_SCANCODE_F9: SDL_Scancode;
+@foreign public const SDL_SCANCODE_F10: SDL_Scancode;
+@foreign public const SDL_SCANCODE_F11: SDL_Scancode;
+@foreign public const SDL_SCANCODE_F12: SDL_Scancode;
+@foreign public const SDL_SCANCODE_PRINTSCREEN: SDL_Scancode;
+@foreign public const SDL_SCANCODE_SCROLLLOCK: SDL_Scancode;
+@foreign public const SDL_SCANCODE_PAUSE: SDL_Scancode;
+@foreign public const SDL_SCANCODE_INSERT: SDL_Scancode;
+@foreign public const SDL_SCANCODE_HOME: SDL_Scancode;
+@foreign public const SDL_SCANCODE_PAGEUP: SDL_Scancode;
+@foreign public const SDL_SCANCODE_DELETE: SDL_Scancode;
+@foreign public const SDL_SCANCODE_END: SDL_Scancode;
+@foreign public const SDL_SCANCODE_PAGEDOWN: SDL_Scancode;
+@foreign public const SDL_SCANCODE_RIGHT: SDL_Scancode;
+@foreign public const SDL_SCANCODE_LEFT: SDL_Scancode;
+@foreign public const SDL_SCANCODE_DOWN: SDL_Scancode;
+@foreign public const SDL_SCANCODE_UP: SDL_Scancode;
+@foreign public const SDL_SCANCODE_NUMLOCKCLEAR: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_DIVIDE: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_MULTIPLY: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_MINUS: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_PLUS: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_ENTER: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_1: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_2: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_3: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_4: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_5: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_6: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_7: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_8: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_9: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_0: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_PERIOD: SDL_Scancode;
+@foreign public const SDL_SCANCODE_NONUSBACKSLASH: SDL_Scancode;
+@foreign public const SDL_SCANCODE_APPLICATION: SDL_Scancode;
+@foreign public const SDL_SCANCODE_POWER: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_EQUALS: SDL_Scancode;
+@foreign public const SDL_SCANCODE_F13: SDL_Scancode;
+@foreign public const SDL_SCANCODE_F14: SDL_Scancode;
+@foreign public const SDL_SCANCODE_F15: SDL_Scancode;
+@foreign public const SDL_SCANCODE_F16: SDL_Scancode;
+@foreign public const SDL_SCANCODE_F17: SDL_Scancode;
+@foreign public const SDL_SCANCODE_F18: SDL_Scancode;
+@foreign public const SDL_SCANCODE_F19: SDL_Scancode;
+@foreign public const SDL_SCANCODE_F20: SDL_Scancode;
+@foreign public const SDL_SCANCODE_F21: SDL_Scancode;
+@foreign public const SDL_SCANCODE_F22: SDL_Scancode;
+@foreign public const SDL_SCANCODE_F23: SDL_Scancode;
+@foreign public const SDL_SCANCODE_F24: SDL_Scancode;
+@foreign public const SDL_SCANCODE_EXECUTE: SDL_Scancode;
+@foreign public const SDL_SCANCODE_HELP: SDL_Scancode;
+@foreign public const SDL_SCANCODE_MENU: SDL_Scancode;
+@foreign public const SDL_SCANCODE_SELECT: SDL_Scancode;
+@foreign public const SDL_SCANCODE_STOP: SDL_Scancode;
+@foreign public const SDL_SCANCODE_AGAIN: SDL_Scancode;
+@foreign public const SDL_SCANCODE_UNDO: SDL_Scancode;
+@foreign public const SDL_SCANCODE_CUT: SDL_Scancode;
+@foreign public const SDL_SCANCODE_COPY: SDL_Scancode;
+@foreign public const SDL_SCANCODE_PASTE: SDL_Scancode;
+@foreign public const SDL_SCANCODE_FIND: SDL_Scancode;
+@foreign public const SDL_SCANCODE_MUTE: SDL_Scancode;
+@foreign public const SDL_SCANCODE_VOLUMEUP: SDL_Scancode;
+@foreign public const SDL_SCANCODE_VOLUMEDOWN: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_COMMA: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_EQUALSAS400: SDL_Scancode;
+@foreign public const SDL_SCANCODE_INTERNATIONAL1: SDL_Scancode;
+@foreign public const SDL_SCANCODE_INTERNATIONAL2: SDL_Scancode;
+@foreign public const SDL_SCANCODE_INTERNATIONAL3: SDL_Scancode;
+@foreign public const SDL_SCANCODE_INTERNATIONAL4: SDL_Scancode;
+@foreign public const SDL_SCANCODE_INTERNATIONAL5: SDL_Scancode;
+@foreign public const SDL_SCANCODE_INTERNATIONAL6: SDL_Scancode;
+@foreign public const SDL_SCANCODE_INTERNATIONAL7: SDL_Scancode;
+@foreign public const SDL_SCANCODE_INTERNATIONAL8: SDL_Scancode;
+@foreign public const SDL_SCANCODE_INTERNATIONAL9: SDL_Scancode;
+@foreign public const SDL_SCANCODE_LANG1: SDL_Scancode;
+@foreign public const SDL_SCANCODE_LANG2: SDL_Scancode;
+@foreign public const SDL_SCANCODE_LANG3: SDL_Scancode;
+@foreign public const SDL_SCANCODE_LANG4: SDL_Scancode;
+@foreign public const SDL_SCANCODE_LANG5: SDL_Scancode;
+@foreign public const SDL_SCANCODE_LANG6: SDL_Scancode;
+@foreign public const SDL_SCANCODE_LANG7: SDL_Scancode;
+@foreign public const SDL_SCANCODE_LANG8: SDL_Scancode;
+@foreign public const SDL_SCANCODE_LANG9: SDL_Scancode;
+@foreign public const SDL_SCANCODE_ALTERASE: SDL_Scancode;
+@foreign public const SDL_SCANCODE_SYSREQ: SDL_Scancode;
+@foreign public const SDL_SCANCODE_CANCEL: SDL_Scancode;
+@foreign public const SDL_SCANCODE_CLEAR: SDL_Scancode;
+@foreign public const SDL_SCANCODE_PRIOR: SDL_Scancode;
+@foreign public const SDL_SCANCODE_RETURN2: SDL_Scancode;
+@foreign public const SDL_SCANCODE_SEPARATOR: SDL_Scancode;
+@foreign public const SDL_SCANCODE_OUT: SDL_Scancode;
+@foreign public const SDL_SCANCODE_OPER: SDL_Scancode;
+@foreign public const SDL_SCANCODE_CLEARAGAIN: SDL_Scancode;
+@foreign public const SDL_SCANCODE_CRSEL: SDL_Scancode;
+@foreign public const SDL_SCANCODE_EXSEL: SDL_Scancode;
+@foreign public const SDL_SCANCODE_FRONT: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_00: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_000: SDL_Scancode;
+@foreign public const SDL_SCANCODE_THOUSANDSSEPARATOR: SDL_Scancode;
+@foreign public const SDL_SCANCODE_DECIMALSEPARATOR: SDL_Scancode;
+@foreign public const SDL_SCANCODE_CURRENCYUNIT: SDL_Scancode;
+@foreign public const SDL_SCANCODE_CURRENCYSUBUNIT: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_LEFTPAREN: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_RIGHTPAREN: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_LEFTBRACE: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_RIGHTBRACE: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_TAB: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_BACKSPACE: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_A: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_B: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_C: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_D: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_E: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_F: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_XOR: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_POWER: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_PERCENT: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_LESS: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_GREATER: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_AMPERSAND: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_DBLAMPERSAND: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_VERTICALBAR: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_DBLVERTICALBAR: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_COLON: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_HASH: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_SPACE: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_AT: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_EXCLAM: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_MEMSTORE: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_MEMRECALL: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_MEMCLEAR: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_MEMADD: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_MEMSUBTRACT: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_MEMMULTIPLY: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_MEMDIVIDE: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_PLUSMINUS: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_CLEAR: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_CLEARENTRY: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_BINARY: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_OCTAL: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_DECIMAL: SDL_Scancode;
+@foreign public const SDL_SCANCODE_KP_HEXADECIMAL: SDL_Scancode;
+@foreign public const SDL_SCANCODE_LCTRL: SDL_Scancode;
+@foreign public const SDL_SCANCODE_LSHIFT: SDL_Scancode;
+@foreign public const SDL_SCANCODE_LALT: SDL_Scancode;
+@foreign public const SDL_SCANCODE_LGUI: SDL_Scancode;
+@foreign public const SDL_SCANCODE_RCTRL: SDL_Scancode;
+@foreign public const SDL_SCANCODE_RSHIFT: SDL_Scancode;
+@foreign public const SDL_SCANCODE_RALT: SDL_Scancode;
+@foreign public const SDL_SCANCODE_RGUI: SDL_Scancode;
+@foreign public const SDL_SCANCODE_MODE: SDL_Scancode;
+@foreign public const SDL_SCANCODE_SLEEP: SDL_Scancode;
+@foreign public const SDL_SCANCODE_WAKE: SDL_Scancode;
+@foreign public const SDL_SCANCODE_CHANNEL_INCREMENT: SDL_Scancode;
+@foreign public const SDL_SCANCODE_CHANNEL_DECREMENT: SDL_Scancode;
+@foreign public const SDL_SCANCODE_MEDIA_PLAY: SDL_Scancode;
+@foreign public const SDL_SCANCODE_MEDIA_PAUSE: SDL_Scancode;
+@foreign public const SDL_SCANCODE_MEDIA_RECORD: SDL_Scancode;
+@foreign public const SDL_SCANCODE_MEDIA_FAST_FORWARD: SDL_Scancode;
+@foreign public const SDL_SCANCODE_MEDIA_REWIND: SDL_Scancode;
+@foreign public const SDL_SCANCODE_MEDIA_NEXT_TRACK: SDL_Scancode;
+@foreign public const SDL_SCANCODE_MEDIA_PREVIOUS_TRACK: SDL_Scancode;
+@foreign public const SDL_SCANCODE_MEDIA_STOP: SDL_Scancode;
+@foreign public const SDL_SCANCODE_MEDIA_EJECT: SDL_Scancode;
+@foreign public const SDL_SCANCODE_MEDIA_PLAY_PAUSE: SDL_Scancode;
+@foreign public const SDL_SCANCODE_MEDIA_SELECT: SDL_Scancode;
+@foreign public const SDL_SCANCODE_AC_NEW: SDL_Scancode;
+@foreign public const SDL_SCANCODE_AC_OPEN: SDL_Scancode;
+@foreign public const SDL_SCANCODE_AC_CLOSE: SDL_Scancode;
+@foreign public const SDL_SCANCODE_AC_EXIT: SDL_Scancode;
+@foreign public const SDL_SCANCODE_AC_SAVE: SDL_Scancode;
+@foreign public const SDL_SCANCODE_AC_PRINT: SDL_Scancode;
+@foreign public const SDL_SCANCODE_AC_PROPERTIES: SDL_Scancode;
+@foreign public const SDL_SCANCODE_AC_SEARCH: SDL_Scancode;
+@foreign public const SDL_SCANCODE_AC_HOME: SDL_Scancode;
+@foreign public const SDL_SCANCODE_AC_BACK: SDL_Scancode;
+@foreign public const SDL_SCANCODE_AC_FORWARD: SDL_Scancode;
+@foreign public const SDL_SCANCODE_AC_STOP: SDL_Scancode;
+@foreign public const SDL_SCANCODE_AC_REFRESH: SDL_Scancode;
+@foreign public const SDL_SCANCODE_AC_BOOKMARKS: SDL_Scancode;
+@foreign public const SDL_SCANCODE_SOFTLEFT: SDL_Scancode;
+@foreign public const SDL_SCANCODE_SOFTRIGHT: SDL_Scancode;
+@foreign public const SDL_SCANCODE_CALL: SDL_Scancode;
+@foreign public const SDL_SCANCODE_ENDCALL: SDL_Scancode;
+@foreign public const SDL_SCANCODE_RESERVED: SDL_Scancode;
+@foreign public const SDL_SCANCODE_COUNT: SDL_Scancode;
+
+// Keycodes
+@foreign public const SDLK_EXTENDED_MASK: SDL_Keycode;
+@foreign public const SDLK_SCANCODE_MASK: SDL_Keycode;
+@foreign public const SDLK_UNKNOWN: SDL_Keycode;
+@foreign public const SDLK_RETURN: SDL_Keycode;
+@foreign public const SDLK_ESCAPE: SDL_Keycode;
+@foreign public const SDLK_BACKSPACE: SDL_Keycode;
+@foreign public const SDLK_TAB: SDL_Keycode;
+@foreign public const SDLK_SPACE: SDL_Keycode;
+@foreign public const SDLK_EXCLAIM: SDL_Keycode;
+@foreign public const SDLK_DBLAPOSTROPHE: SDL_Keycode;
+@foreign public const SDLK_HASH: SDL_Keycode;
+@foreign public const SDLK_DOLLAR: SDL_Keycode;
+@foreign public const SDLK_PERCENT: SDL_Keycode;
+@foreign public const SDLK_AMPERSAND: SDL_Keycode;
+@foreign public const SDLK_APOSTROPHE: SDL_Keycode;
+@foreign public const SDLK_LEFTPAREN: SDL_Keycode;
+@foreign public const SDLK_RIGHTPAREN: SDL_Keycode;
+@foreign public const SDLK_ASTERISK: SDL_Keycode;
+@foreign public const SDLK_PLUS: SDL_Keycode;
+@foreign public const SDLK_COMMA: SDL_Keycode;
+@foreign public const SDLK_MINUS: SDL_Keycode;
+@foreign public const SDLK_PERIOD: SDL_Keycode;
+@foreign public const SDLK_SLASH: SDL_Keycode;
+@foreign public const SDLK_0: SDL_Keycode;
+@foreign public const SDLK_1: SDL_Keycode;
+@foreign public const SDLK_2: SDL_Keycode;
+@foreign public const SDLK_3: SDL_Keycode;
+@foreign public const SDLK_4: SDL_Keycode;
+@foreign public const SDLK_5: SDL_Keycode;
+@foreign public const SDLK_6: SDL_Keycode;
+@foreign public const SDLK_7: SDL_Keycode;
+@foreign public const SDLK_8: SDL_Keycode;
+@foreign public const SDLK_9: SDL_Keycode;
+@foreign public const SDLK_COLON: SDL_Keycode;
+@foreign public const SDLK_SEMICOLON: SDL_Keycode;
+@foreign public const SDLK_LESS: SDL_Keycode;
+@foreign public const SDLK_EQUALS: SDL_Keycode;
+@foreign public const SDLK_GREATER: SDL_Keycode;
+@foreign public const SDLK_QUESTION: SDL_Keycode;
+@foreign public const SDLK_AT: SDL_Keycode;
+@foreign public const SDLK_LEFTBRACKET: SDL_Keycode;
+@foreign public const SDLK_BACKSLASH: SDL_Keycode;
+@foreign public const SDLK_RIGHTBRACKET: SDL_Keycode;
+@foreign public const SDLK_CARET: SDL_Keycode;
+@foreign public const SDLK_UNDERSCORE: SDL_Keycode;
+@foreign public const SDLK_GRAVE: SDL_Keycode;
+@foreign public const SDLK_A: SDL_Keycode;
+@foreign public const SDLK_B: SDL_Keycode;
+@foreign public const SDLK_C: SDL_Keycode;
+@foreign public const SDLK_D: SDL_Keycode;
+@foreign public const SDLK_E: SDL_Keycode;
+@foreign public const SDLK_F: SDL_Keycode;
+@foreign public const SDLK_G: SDL_Keycode;
+@foreign public const SDLK_H: SDL_Keycode;
+@foreign public const SDLK_I: SDL_Keycode;
+@foreign public const SDLK_J: SDL_Keycode;
+@foreign public const SDLK_K: SDL_Keycode;
+@foreign public const SDLK_L: SDL_Keycode;
+@foreign public const SDLK_M: SDL_Keycode;
+@foreign public const SDLK_N: SDL_Keycode;
+@foreign public const SDLK_O: SDL_Keycode;
+@foreign public const SDLK_P: SDL_Keycode;
+@foreign public const SDLK_Q: SDL_Keycode;
+@foreign public const SDLK_R: SDL_Keycode;
+@foreign public const SDLK_S: SDL_Keycode;
+@foreign public const SDLK_T: SDL_Keycode;
+@foreign public const SDLK_U: SDL_Keycode;
+@foreign public const SDLK_V: SDL_Keycode;
+@foreign public const SDLK_W: SDL_Keycode;
+@foreign public const SDLK_X: SDL_Keycode;
+@foreign public const SDLK_Y: SDL_Keycode;
+@foreign public const SDLK_Z: SDL_Keycode;
+@foreign public const SDLK_LEFTBRACE: SDL_Keycode;
+@foreign public const SDLK_PIPE: SDL_Keycode;
+@foreign public const SDLK_RIGHTBRACE: SDL_Keycode;
+@foreign public const SDLK_TILDE: SDL_Keycode;
+@foreign public const SDLK_DELETE: SDL_Keycode;
+@foreign public const SDLK_PLUSMINUS: SDL_Keycode;
+@foreign public const SDLK_CAPSLOCK: SDL_Keycode;
+@foreign public const SDLK_F1: SDL_Keycode;
+@foreign public const SDLK_F2: SDL_Keycode;
+@foreign public const SDLK_F3: SDL_Keycode;
+@foreign public const SDLK_F4: SDL_Keycode;
+@foreign public const SDLK_F5: SDL_Keycode;
+@foreign public const SDLK_F6: SDL_Keycode;
+@foreign public const SDLK_F7: SDL_Keycode;
+@foreign public const SDLK_F8: SDL_Keycode;
+@foreign public const SDLK_F9: SDL_Keycode;
+@foreign public const SDLK_F10: SDL_Keycode;
+@foreign public const SDLK_F11: SDL_Keycode;
+@foreign public const SDLK_F12: SDL_Keycode;
+@foreign public const SDLK_PRINTSCREEN: SDL_Keycode;
+@foreign public const SDLK_SCROLLLOCK: SDL_Keycode;
+@foreign public const SDLK_PAUSE: SDL_Keycode;
+@foreign public const SDLK_INSERT: SDL_Keycode;
+@foreign public const SDLK_HOME: SDL_Keycode;
+@foreign public const SDLK_PAGEUP: SDL_Keycode;
+@foreign public const SDLK_END: SDL_Keycode;
+@foreign public const SDLK_PAGEDOWN: SDL_Keycode;
+@foreign public const SDLK_RIGHT: SDL_Keycode;
+@foreign public const SDLK_LEFT: SDL_Keycode;
+@foreign public const SDLK_DOWN: SDL_Keycode;
+@foreign public const SDLK_UP: SDL_Keycode;
+@foreign public const SDLK_NUMLOCKCLEAR: SDL_Keycode;
+@foreign public const SDLK_KP_DIVIDE: SDL_Keycode;
+@foreign public const SDLK_KP_MULTIPLY: SDL_Keycode;
+@foreign public const SDLK_KP_MINUS: SDL_Keycode;
+@foreign public const SDLK_KP_PLUS: SDL_Keycode;
+@foreign public const SDLK_KP_ENTER: SDL_Keycode;
+@foreign public const SDLK_KP_1: SDL_Keycode;
+@foreign public const SDLK_KP_2: SDL_Keycode;
+@foreign public const SDLK_KP_3: SDL_Keycode;
+@foreign public const SDLK_KP_4: SDL_Keycode;
+@foreign public const SDLK_KP_5: SDL_Keycode;
+@foreign public const SDLK_KP_6: SDL_Keycode;
+@foreign public const SDLK_KP_7: SDL_Keycode;
+@foreign public const SDLK_KP_8: SDL_Keycode;
+@foreign public const SDLK_KP_9: SDL_Keycode;
+@foreign public const SDLK_KP_0: SDL_Keycode;
+@foreign public const SDLK_KP_PERIOD: SDL_Keycode;
+@foreign public const SDLK_APPLICATION: SDL_Keycode;
+@foreign public const SDLK_POWER: SDL_Keycode;
+@foreign public const SDLK_KP_EQUALS: SDL_Keycode;
+@foreign public const SDLK_F13: SDL_Keycode;
+@foreign public const SDLK_F14: SDL_Keycode;
+@foreign public const SDLK_F15: SDL_Keycode;
+@foreign public const SDLK_F16: SDL_Keycode;
+@foreign public const SDLK_F17: SDL_Keycode;
+@foreign public const SDLK_F18: SDL_Keycode;
+@foreign public const SDLK_F19: SDL_Keycode;
+@foreign public const SDLK_F20: SDL_Keycode;
+@foreign public const SDLK_F21: SDL_Keycode;
+@foreign public const SDLK_F22: SDL_Keycode;
+@foreign public const SDLK_F23: SDL_Keycode;
+@foreign public const SDLK_F24: SDL_Keycode;
+@foreign public const SDLK_EXECUTE: SDL_Keycode;
+@foreign public const SDLK_HELP: SDL_Keycode;
+@foreign public const SDLK_MENU: SDL_Keycode;
+@foreign public const SDLK_SELECT: SDL_Keycode;
+@foreign public const SDLK_STOP: SDL_Keycode;
+@foreign public const SDLK_AGAIN: SDL_Keycode;
+@foreign public const SDLK_UNDO: SDL_Keycode;
+@foreign public const SDLK_CUT: SDL_Keycode;
+@foreign public const SDLK_COPY: SDL_Keycode;
+@foreign public const SDLK_PASTE: SDL_Keycode;
+@foreign public const SDLK_FIND: SDL_Keycode;
+@foreign public const SDLK_MUTE: SDL_Keycode;
+@foreign public const SDLK_VOLUMEUP: SDL_Keycode;
+@foreign public const SDLK_VOLUMEDOWN: SDL_Keycode;
+@foreign public const SDLK_KP_COMMA: SDL_Keycode;
+@foreign public const SDLK_KP_EQUALSAS400: SDL_Keycode;
+@foreign public const SDLK_ALTERASE: SDL_Keycode;
+@foreign public const SDLK_SYSREQ: SDL_Keycode;
+@foreign public const SDLK_CANCEL: SDL_Keycode;
+@foreign public const SDLK_CLEAR: SDL_Keycode;
+@foreign public const SDLK_PRIOR: SDL_Keycode;
+@foreign public const SDLK_RETURN2: SDL_Keycode;
+@foreign public const SDLK_SEPARATOR: SDL_Keycode;
+@foreign public const SDLK_OUT: SDL_Keycode;
+@foreign public const SDLK_OPER: SDL_Keycode;
+@foreign public const SDLK_CLEARAGAIN: SDL_Keycode;
+@foreign public const SDLK_CRSEL: SDL_Keycode;
+@foreign public const SDLK_EXSEL: SDL_Keycode;
+@foreign public const SDLK_FRONT: SDL_Keycode;
+@foreign public const SDLK_KP_00: SDL_Keycode;
+@foreign public const SDLK_KP_000: SDL_Keycode;
+@foreign public const SDLK_THOUSANDSSEPARATOR: SDL_Keycode;
+@foreign public const SDLK_DECIMALSEPARATOR: SDL_Keycode;
+@foreign public const SDLK_CURRENCYUNIT: SDL_Keycode;
+@foreign public const SDLK_CURRENCYSUBUNIT: SDL_Keycode;
+@foreign public const SDLK_KP_LEFTPAREN: SDL_Keycode;
+@foreign public const SDLK_KP_RIGHTPAREN: SDL_Keycode;
+@foreign public const SDLK_KP_LEFTBRACE: SDL_Keycode;
+@foreign public const SDLK_KP_RIGHTBRACE: SDL_Keycode;
+@foreign public const SDLK_KP_TAB: SDL_Keycode;
+@foreign public const SDLK_KP_BACKSPACE: SDL_Keycode;
+@foreign public const SDLK_KP_A: SDL_Keycode;
+@foreign public const SDLK_KP_B: SDL_Keycode;
+@foreign public const SDLK_KP_C: SDL_Keycode;
+@foreign public const SDLK_KP_D: SDL_Keycode;
+@foreign public const SDLK_KP_E: SDL_Keycode;
+@foreign public const SDLK_KP_F: SDL_Keycode;
+@foreign public const SDLK_KP_XOR: SDL_Keycode;
+@foreign public const SDLK_KP_POWER: SDL_Keycode;
+@foreign public const SDLK_KP_PERCENT: SDL_Keycode;
+@foreign public const SDLK_KP_LESS: SDL_Keycode;
+@foreign public const SDLK_KP_GREATER: SDL_Keycode;
+@foreign public const SDLK_KP_AMPERSAND: SDL_Keycode;
+@foreign public const SDLK_KP_DBLAMPERSAND: SDL_Keycode;
+@foreign public const SDLK_KP_VERTICALBAR: SDL_Keycode;
+@foreign public const SDLK_KP_DBLVERTICALBAR: SDL_Keycode;
+@foreign public const SDLK_KP_COLON: SDL_Keycode;
+@foreign public const SDLK_KP_HASH: SDL_Keycode;
+@foreign public const SDLK_KP_SPACE: SDL_Keycode;
+@foreign public const SDLK_KP_AT: SDL_Keycode;
+@foreign public const SDLK_KP_EXCLAM: SDL_Keycode;
+@foreign public const SDLK_KP_MEMSTORE: SDL_Keycode;
+@foreign public const SDLK_KP_MEMRECALL: SDL_Keycode;
+@foreign public const SDLK_KP_MEMCLEAR: SDL_Keycode;
+@foreign public const SDLK_KP_MEMADD: SDL_Keycode;
+@foreign public const SDLK_KP_MEMSUBTRACT: SDL_Keycode;
+@foreign public const SDLK_KP_MEMMULTIPLY: SDL_Keycode;
+@foreign public const SDLK_KP_MEMDIVIDE: SDL_Keycode;
+@foreign public const SDLK_KP_PLUSMINUS: SDL_Keycode;
+@foreign public const SDLK_KP_CLEAR: SDL_Keycode;
+@foreign public const SDLK_KP_CLEARENTRY: SDL_Keycode;
+@foreign public const SDLK_KP_BINARY: SDL_Keycode;
+@foreign public const SDLK_KP_OCTAL: SDL_Keycode;
+@foreign public const SDLK_KP_DECIMAL: SDL_Keycode;
+@foreign public const SDLK_KP_HEXADECIMAL: SDL_Keycode;
+@foreign public const SDLK_LCTRL: SDL_Keycode;
+@foreign public const SDLK_LSHIFT: SDL_Keycode;
+@foreign public const SDLK_LALT: SDL_Keycode;
+@foreign public const SDLK_LGUI: SDL_Keycode;
+@foreign public const SDLK_RCTRL: SDL_Keycode;
+@foreign public const SDLK_RSHIFT: SDL_Keycode;
+@foreign public const SDLK_RALT: SDL_Keycode;
+@foreign public const SDLK_RGUI: SDL_Keycode;
+@foreign public const SDLK_MODE: SDL_Keycode;
+@foreign public const SDLK_SLEEP: SDL_Keycode;
+@foreign public const SDLK_WAKE: SDL_Keycode;
+@foreign public const SDLK_CHANNEL_INCREMENT: SDL_Keycode;
+@foreign public const SDLK_CHANNEL_DECREMENT: SDL_Keycode;
+@foreign public const SDLK_MEDIA_PLAY: SDL_Keycode;
+@foreign public const SDLK_MEDIA_PAUSE: SDL_Keycode;
+@foreign public const SDLK_MEDIA_RECORD: SDL_Keycode;
+@foreign public const SDLK_MEDIA_FAST_FORWARD: SDL_Keycode;
+@foreign public const SDLK_MEDIA_REWIND: SDL_Keycode;
+@foreign public const SDLK_MEDIA_NEXT_TRACK: SDL_Keycode;
+@foreign public const SDLK_MEDIA_PREVIOUS_TRACK: SDL_Keycode;
+@foreign public const SDLK_MEDIA_STOP: SDL_Keycode;
+@foreign public const SDLK_MEDIA_EJECT: SDL_Keycode;
+@foreign public const SDLK_MEDIA_PLAY_PAUSE: SDL_Keycode;
+@foreign public const SDLK_MEDIA_SELECT: SDL_Keycode;
+@foreign public const SDLK_AC_NEW: SDL_Keycode;
+@foreign public const SDLK_AC_OPEN: SDL_Keycode;
+@foreign public const SDLK_AC_CLOSE: SDL_Keycode;
+@foreign public const SDLK_AC_EXIT: SDL_Keycode;
+@foreign public const SDLK_AC_SAVE: SDL_Keycode;
+@foreign public const SDLK_AC_PRINT: SDL_Keycode;
+@foreign public const SDLK_AC_PROPERTIES: SDL_Keycode;
+@foreign public const SDLK_AC_SEARCH: SDL_Keycode;
+@foreign public const SDLK_AC_HOME: SDL_Keycode;
+@foreign public const SDLK_AC_BACK: SDL_Keycode;
+@foreign public const SDLK_AC_FORWARD: SDL_Keycode;
+@foreign public const SDLK_AC_STOP: SDL_Keycode;
+@foreign public const SDLK_AC_REFRESH: SDL_Keycode;
+@foreign public const SDLK_AC_BOOKMARKS: SDL_Keycode;
+@foreign public const SDLK_SOFTLEFT: SDL_Keycode;
+@foreign public const SDLK_SOFTRIGHT: SDL_Keycode;
+@foreign public const SDLK_CALL: SDL_Keycode;
+@foreign public const SDLK_ENDCALL: SDL_Keycode;
+@foreign public const SDLK_LEFT_TAB: SDL_Keycode;
+@foreign public const SDLK_LEVEL5_SHIFT: SDL_Keycode;
+@foreign public const SDLK_MULTI_KEY_COMPOSE: SDL_Keycode;
+@foreign public const SDLK_LMETA: SDL_Keycode;
+@foreign public const SDLK_RMETA: SDL_Keycode;
+@foreign public const SDLK_LHYPER: SDL_Keycode;
+@foreign public const SDLK_RHYPER: SDL_Keycode;
+
+// Key modifiers
+@foreign public const SDL_KMOD_NONE: SDL_Keymod;
+@foreign public const SDL_KMOD_LSHIFT: SDL_Keymod;
+@foreign public const SDL_KMOD_RSHIFT: SDL_Keymod;
+@foreign public const SDL_KMOD_LEVEL5: SDL_Keymod;
+@foreign public const SDL_KMOD_LCTRL: SDL_Keymod;
+@foreign public const SDL_KMOD_RCTRL: SDL_Keymod;
+@foreign public const SDL_KMOD_LALT: SDL_Keymod;
+@foreign public const SDL_KMOD_RALT: SDL_Keymod;
+@foreign public const SDL_KMOD_LGUI: SDL_Keymod;
+@foreign public const SDL_KMOD_RGUI: SDL_Keymod;
+@foreign public const SDL_KMOD_NUM: SDL_Keymod;
+@foreign public const SDL_KMOD_CAPS: SDL_Keymod;
+@foreign public const SDL_KMOD_MODE: SDL_Keymod;
+@foreign public const SDL_KMOD_SCROLL: SDL_Keymod;
+@foreign public const SDL_KMOD_CTRL: SDL_Keymod;
+@foreign public const SDL_KMOD_SHIFT: SDL_Keymod;
+@foreign public const SDL_KMOD_ALT: SDL_Keymod;
+@foreign public const SDL_KMOD_GUI: SDL_Keymod;
+
+// Gamepad axes
+@foreign public const SDL_GAMEPAD_AXIS_INVALID: SDL_GamepadAxis;
+@foreign public const SDL_GAMEPAD_AXIS_LEFTX: SDL_GamepadAxis;
+@foreign public const SDL_GAMEPAD_AXIS_LEFTY: SDL_GamepadAxis;
+@foreign public const SDL_GAMEPAD_AXIS_RIGHTX: SDL_GamepadAxis;
+@foreign public const SDL_GAMEPAD_AXIS_RIGHTY: SDL_GamepadAxis;
+@foreign public const SDL_GAMEPAD_AXIS_LEFT_TRIGGER: SDL_GamepadAxis;
+@foreign public const SDL_GAMEPAD_AXIS_RIGHT_TRIGGER: SDL_GamepadAxis;
+@foreign public const SDL_GAMEPAD_AXIS_COUNT: SDL_GamepadAxis;
+
+// Gamepad buttons
+@foreign public const SDL_GAMEPAD_BUTTON_INVALID: SDL_GamepadButton;
+@foreign public const SDL_GAMEPAD_BUTTON_SOUTH: SDL_GamepadButton;
+@foreign public const SDL_GAMEPAD_BUTTON_EAST: SDL_GamepadButton;
+@foreign public const SDL_GAMEPAD_BUTTON_WEST: SDL_GamepadButton;
+@foreign public const SDL_GAMEPAD_BUTTON_NORTH: SDL_GamepadButton;
+@foreign public const SDL_GAMEPAD_BUTTON_BACK: SDL_GamepadButton;
+@foreign public const SDL_GAMEPAD_BUTTON_GUIDE: SDL_GamepadButton;
+@foreign public const SDL_GAMEPAD_BUTTON_START: SDL_GamepadButton;
+@foreign public const SDL_GAMEPAD_BUTTON_LEFT_STICK: SDL_GamepadButton;
+@foreign public const SDL_GAMEPAD_BUTTON_RIGHT_STICK: SDL_GamepadButton;
+@foreign public const SDL_GAMEPAD_BUTTON_LEFT_SHOULDER: SDL_GamepadButton;
+@foreign public const SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER: SDL_GamepadButton;
+@foreign public const SDL_GAMEPAD_BUTTON_DPAD_UP: SDL_GamepadButton;
+@foreign public const SDL_GAMEPAD_BUTTON_DPAD_DOWN: SDL_GamepadButton;
+@foreign public const SDL_GAMEPAD_BUTTON_DPAD_LEFT: SDL_GamepadButton;
+@foreign public const SDL_GAMEPAD_BUTTON_DPAD_RIGHT: SDL_GamepadButton;
+@foreign public const SDL_GAMEPAD_BUTTON_MISC1: SDL_GamepadButton;
+@foreign public const SDL_GAMEPAD_BUTTON_RIGHT_PADDLE1: SDL_GamepadButton;
+@foreign public const SDL_GAMEPAD_BUTTON_LEFT_PADDLE1: SDL_GamepadButton;
+@foreign public const SDL_GAMEPAD_BUTTON_RIGHT_PADDLE2: SDL_GamepadButton;
+@foreign public const SDL_GAMEPAD_BUTTON_LEFT_PADDLE2: SDL_GamepadButton;
+@foreign public const SDL_GAMEPAD_BUTTON_TOUCHPAD: SDL_GamepadButton;
+@foreign public const SDL_GAMEPAD_BUTTON_MISC2: SDL_GamepadButton;
+@foreign public const SDL_GAMEPAD_BUTTON_MISC3: SDL_GamepadButton;
+@foreign public const SDL_GAMEPAD_BUTTON_MISC4: SDL_GamepadButton;
+@foreign public const SDL_GAMEPAD_BUTTON_MISC5: SDL_GamepadButton;
+@foreign public const SDL_GAMEPAD_BUTTON_MISC6: SDL_GamepadButton;
+@foreign public const SDL_GAMEPAD_BUTTON_COUNT: SDL_GamepadButton;
+
