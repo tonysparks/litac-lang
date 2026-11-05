@@ -1,0 +1,260 @@
+// cgltf v1.15 bindings (https://github.com/jkuhlmann/cgltf, MIT license -- see LICENSE).
+// glTF 2.0 parser: meshes, skins, nodes, animations and materials. Only the struct
+// fields needed to load skinned, animated meshes are declared; the C header is
+// authoritative for layout.
+@raw("""
+#define CGLTF_IMPLEMENTATION
+""");
+@include("cgltf.h");
+
+@compiler_option(
+    .options = "-I{relativePath}"
+);
+
+@foreign public typedef usize as cgltf_size;
+@foreign public typedef f32 as cgltf_float;
+@foreign public typedef i32 as cgltf_int;
+@foreign public typedef u32 as cgltf_uint;
+@foreign public typedef i32 as cgltf_bool;
+
+@foreign public typedef i32 as cgltf_result;
+@foreign public const cgltf_result_success: cgltf_result;
+@foreign public const cgltf_result_data_too_short: cgltf_result;
+@foreign public const cgltf_result_unknown_format: cgltf_result;
+@foreign public const cgltf_result_invalid_json: cgltf_result;
+@foreign public const cgltf_result_invalid_gltf: cgltf_result;
+@foreign public const cgltf_result_invalid_options: cgltf_result;
+@foreign public const cgltf_result_file_not_found: cgltf_result;
+@foreign public const cgltf_result_io_error: cgltf_result;
+@foreign public const cgltf_result_out_of_memory: cgltf_result;
+@foreign public const cgltf_result_legacy_gltf: cgltf_result;
+
+@foreign public typedef i32 as cgltf_file_type;
+@foreign public const cgltf_file_type_invalid: cgltf_file_type;
+@foreign public const cgltf_file_type_gltf: cgltf_file_type;
+@foreign public const cgltf_file_type_glb: cgltf_file_type;
+
+@foreign public typedef i32 as cgltf_attribute_type;
+@foreign public const cgltf_attribute_type_invalid: cgltf_attribute_type;
+@foreign public const cgltf_attribute_type_position: cgltf_attribute_type;
+@foreign public const cgltf_attribute_type_normal: cgltf_attribute_type;
+@foreign public const cgltf_attribute_type_tangent: cgltf_attribute_type;
+@foreign public const cgltf_attribute_type_texcoord: cgltf_attribute_type;
+@foreign public const cgltf_attribute_type_color: cgltf_attribute_type;
+@foreign public const cgltf_attribute_type_joints: cgltf_attribute_type;
+@foreign public const cgltf_attribute_type_weights: cgltf_attribute_type;
+@foreign public const cgltf_attribute_type_custom: cgltf_attribute_type;
+
+@foreign public typedef i32 as cgltf_component_type;
+@foreign public const cgltf_component_type_invalid: cgltf_component_type;
+@foreign public const cgltf_component_type_r_8: cgltf_component_type;
+@foreign public const cgltf_component_type_r_8u: cgltf_component_type;
+@foreign public const cgltf_component_type_r_16: cgltf_component_type;
+@foreign public const cgltf_component_type_r_16u: cgltf_component_type;
+@foreign public const cgltf_component_type_r_32u: cgltf_component_type;
+@foreign public const cgltf_component_type_r_32f: cgltf_component_type;
+
+@foreign public typedef i32 as cgltf_type;
+@foreign public const cgltf_type_invalid: cgltf_type;
+@foreign public const cgltf_type_scalar: cgltf_type;
+@foreign public const cgltf_type_vec2: cgltf_type;
+@foreign public const cgltf_type_vec3: cgltf_type;
+@foreign public const cgltf_type_vec4: cgltf_type;
+@foreign public const cgltf_type_mat2: cgltf_type;
+@foreign public const cgltf_type_mat3: cgltf_type;
+@foreign public const cgltf_type_mat4: cgltf_type;
+
+@foreign public typedef i32 as cgltf_primitive_type;
+@foreign public const cgltf_primitive_type_points: cgltf_primitive_type;
+@foreign public const cgltf_primitive_type_lines: cgltf_primitive_type;
+@foreign public const cgltf_primitive_type_line_loop: cgltf_primitive_type;
+@foreign public const cgltf_primitive_type_line_strip: cgltf_primitive_type;
+@foreign public const cgltf_primitive_type_triangles: cgltf_primitive_type;
+@foreign public const cgltf_primitive_type_triangle_strip: cgltf_primitive_type;
+@foreign public const cgltf_primitive_type_triangle_fan: cgltf_primitive_type;
+
+@foreign public typedef i32 as cgltf_animation_path_type;
+@foreign public const cgltf_animation_path_type_invalid: cgltf_animation_path_type;
+@foreign public const cgltf_animation_path_type_translation: cgltf_animation_path_type;
+@foreign public const cgltf_animation_path_type_rotation: cgltf_animation_path_type;
+@foreign public const cgltf_animation_path_type_scale: cgltf_animation_path_type;
+@foreign public const cgltf_animation_path_type_weights: cgltf_animation_path_type;
+
+@foreign public typedef i32 as cgltf_interpolation_type;
+@foreign public const cgltf_interpolation_type_linear: cgltf_interpolation_type;
+@foreign public const cgltf_interpolation_type_step: cgltf_interpolation_type;
+@foreign public const cgltf_interpolation_type_cubic_spline: cgltf_interpolation_type;
+
+//--------------------------------------------------------------------------------------------
+// Options
+//--------------------------------------------------------------------------------------------
+
+// Lets the parser allocate from a custom allocator; null funcs use malloc/free.
+@foreign public struct cgltf_memory_options {
+    alloc_func: func(*void, usize) : *void
+    free_func: func(*void, *void) : void
+    user_data: *void
+}
+
+@foreign public struct cgltf_file_options {
+    user_data: *void
+}
+
+@foreign public struct cgltf_options {
+    type: cgltf_file_type
+    json_token_count: cgltf_size
+    memory: cgltf_memory_options
+    file: cgltf_file_options
+}
+
+//--------------------------------------------------------------------------------------------
+// Data
+//--------------------------------------------------------------------------------------------
+
+@foreign public struct cgltf_buffer_view {}
+
+@foreign public struct cgltf_accessor {
+    name: *char
+    component_type: cgltf_component_type
+    normalized: cgltf_bool
+    type: cgltf_type
+    offset: cgltf_size
+    count: cgltf_size
+    stride: cgltf_size
+    buffer_view: *cgltf_buffer_view
+    has_min: cgltf_bool
+    min: [16]cgltf_float
+    has_max: cgltf_bool
+    max: [16]cgltf_float
+    is_sparse: cgltf_bool
+}
+
+@foreign public struct cgltf_attribute {
+    name: *char
+    type: cgltf_attribute_type
+    index: cgltf_int
+    data: *cgltf_accessor
+}
+
+@foreign public struct cgltf_pbr_metallic_roughness {
+    base_color_factor: [4]cgltf_float
+    metallic_factor: cgltf_float
+    roughness_factor: cgltf_float
+}
+
+@foreign public struct cgltf_material {
+    name: *char
+    has_pbr_metallic_roughness: cgltf_bool
+    pbr_metallic_roughness: cgltf_pbr_metallic_roughness
+    emissive_factor: [3]cgltf_float
+    alpha_cutoff: cgltf_float
+    double_sided: cgltf_bool
+    unlit: cgltf_bool
+}
+
+@foreign public struct cgltf_primitive {
+    type: cgltf_primitive_type
+    indices: *cgltf_accessor
+    material: *cgltf_material
+    attributes: *cgltf_attribute
+    attributes_count: cgltf_size
+}
+
+@foreign public struct cgltf_mesh {
+    name: *char
+    primitives: *cgltf_primitive
+    primitives_count: cgltf_size
+}
+
+@foreign public struct cgltf_skin {
+    name: *char
+    joints: **cgltf_node
+    joints_count: cgltf_size
+    skeleton: *cgltf_node
+    inverse_bind_matrices: *cgltf_accessor
+}
+
+@foreign public struct cgltf_node {
+    name: *char
+    parent: *cgltf_node
+    children: **cgltf_node
+    children_count: cgltf_size
+    skin: *cgltf_skin
+    mesh: *cgltf_mesh
+    has_translation: cgltf_bool
+    has_rotation: cgltf_bool
+    has_scale: cgltf_bool
+    has_matrix: cgltf_bool
+    translation: [3]cgltf_float
+    rotation: [4]cgltf_float
+    scale: [3]cgltf_float
+    matrix: [16]cgltf_float
+}
+
+@foreign public struct cgltf_animation_sampler {
+    input: *cgltf_accessor
+    output: *cgltf_accessor
+    interpolation: cgltf_interpolation_type
+}
+
+@foreign public struct cgltf_animation_channel {
+    sampler: *cgltf_animation_sampler
+    target_node: *cgltf_node
+    target_path: cgltf_animation_path_type
+}
+
+@foreign public struct cgltf_animation {
+    name: *char
+    samplers: *cgltf_animation_sampler
+    samplers_count: cgltf_size
+    channels: *cgltf_animation_channel
+    channels_count: cgltf_size
+}
+
+@foreign public struct cgltf_scene {
+    name: *char
+    nodes: **cgltf_node
+    nodes_count: cgltf_size
+}
+
+@foreign public struct cgltf_data {
+    file_type: cgltf_file_type
+    meshes: *cgltf_mesh
+    meshes_count: cgltf_size
+    materials: *cgltf_material
+    materials_count: cgltf_size
+    accessors: *cgltf_accessor
+    accessors_count: cgltf_size
+    skins: *cgltf_skin
+    skins_count: cgltf_size
+    nodes: *cgltf_node
+    nodes_count: cgltf_size
+    scenes: *cgltf_scene
+    scenes_count: cgltf_size
+    scene: *cgltf_scene
+    animations: *cgltf_animation
+    animations_count: cgltf_size
+}
+
+//--------------------------------------------------------------------------------------------
+// Functions
+//--------------------------------------------------------------------------------------------
+
+// Parses a .gltf or .glb; follow with cgltf_load_buffers for external .bin data.
+@foreign public func cgltf_parse_file(options: *const cgltf_options, path: *const char, outData: **cgltf_data) : cgltf_result;
+@foreign public func cgltf_parse(options: *const cgltf_options, data: *const void, size: cgltf_size, outData: **cgltf_data) : cgltf_result;
+@foreign public func cgltf_load_buffers(options: *const cgltf_options, data: *cgltf_data, gltfPath: *const char) : cgltf_result;
+@foreign public func cgltf_validate(data: *cgltf_data) : cgltf_result;
+@foreign public func cgltf_free(data: *cgltf_data);
+
+@foreign public func cgltf_node_transform_local(node: *const cgltf_node, outMatrix: *cgltf_float);
+@foreign public func cgltf_node_transform_world(node: *const cgltf_node, outMatrix: *cgltf_float);
+
+@foreign public func cgltf_num_components(type: cgltf_type) : cgltf_size;
+@foreign public func cgltf_accessor_read_float(accessor: *const cgltf_accessor, index: cgltf_size, out: *cgltf_float, elementSize: cgltf_size) : cgltf_bool;
+@foreign public func cgltf_accessor_read_uint(accessor: *const cgltf_accessor, index: cgltf_size, out: *cgltf_uint, elementSize: cgltf_size) : cgltf_bool;
+@foreign public func cgltf_accessor_read_index(accessor: *const cgltf_accessor, index: cgltf_size) : cgltf_size;
+
+// Unpacks the whole accessor as floats; pass null out to get the float count needed.
+@foreign public func cgltf_accessor_unpack_floats(accessor: *const cgltf_accessor, out: *cgltf_float, floatCount: cgltf_size) : cgltf_size;
+@foreign public func cgltf_accessor_unpack_indices(accessor: *const cgltf_accessor, out: *void, outComponentSize: cgltf_size, indexCount: cgltf_size) : cgltf_size;

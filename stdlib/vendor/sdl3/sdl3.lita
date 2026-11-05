@@ -220,6 +220,10 @@
 // Directory of the running executable (with trailing separator); owned by SDL, do not free.
 @foreign public func SDL_GetBasePath() : *const char;
 
+// Per-user writable directory for settings and saves (created if missing, trailing
+// separator); release with SDL_free.
+@foreign public func SDL_GetPrefPath(org: *const char, app: *const char) : *char;
+
 @foreign public const SDL_MESSAGEBOX_ERROR: SDL_MessageBoxFlags;
 @foreign public const SDL_MESSAGEBOX_WARNING: SDL_MessageBoxFlags;
 @foreign public const SDL_MESSAGEBOX_INFORMATION: SDL_MessageBoxFlags;
@@ -413,6 +417,10 @@
 @foreign public func SDL_ClearAudioStream(stream: *SDL_AudioStream) : bool;
 @foreign public func SDL_SetAudioStreamGain(stream: *SDL_AudioStream, gain: f32) : bool;
 @foreign public func SDL_SetAudioStreamFrequencyRatio(stream: *SDL_AudioStream, ratio: f32) : bool;
+
+// Guards changes the audio callback reads; the callback runs with the stream locked.
+@foreign public func SDL_LockAudioStream(stream: *SDL_AudioStream) : bool;
+@foreign public func SDL_UnlockAudioStream(stream: *SDL_AudioStream) : bool;
 
 // audioBuf is allocated by SDL and must be released with SDL_free.
 @foreign public func SDL_LoadWAV(path: *const char, spec: *SDL_AudioSpec, audioBuf: **u8, audioLen: *u32) : bool;
