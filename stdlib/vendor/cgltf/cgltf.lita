@@ -1,5 +1,5 @@
 // cgltf v1.15 bindings (https://github.com/jkuhlmann/cgltf, MIT license -- see LICENSE).
-// glTF 2.0 parser: meshes, skins, nodes, animations and materials. Only the struct
+// glTF 2.0 parser: meshes, skins, nodes, animations, materials and their images. Only the struct
 // fields needed to load skinned, animated meshes are declared; the C header is
 // authoritative for layout.
 @raw("""
@@ -111,7 +111,31 @@
 // Data
 //--------------------------------------------------------------------------------------------
 
-@foreign public struct cgltf_buffer_view {}
+@foreign public struct cgltf_buffer_view {
+    offset: cgltf_size
+    size: cgltf_size
+}
+
+// The bytes a buffer view covers (e.g. an image embedded in a .glb).
+@foreign public func cgltf_buffer_view_data(view: *const cgltf_buffer_view) : *const u8;
+
+@foreign public struct cgltf_image {
+    name: *char
+    uri: *char
+    buffer_view: *cgltf_buffer_view
+    mime_type: *char
+}
+
+@foreign public struct cgltf_texture {
+    name: *char
+    image: *cgltf_image
+}
+
+@foreign public struct cgltf_texture_view {
+    texture: *cgltf_texture
+    texcoord: cgltf_int
+    scale: cgltf_float
+}
 
 @foreign public struct cgltf_accessor {
     name: *char
@@ -137,6 +161,8 @@
 }
 
 @foreign public struct cgltf_pbr_metallic_roughness {
+    base_color_texture: cgltf_texture_view
+    metallic_roughness_texture: cgltf_texture_view
     base_color_factor: [4]cgltf_float
     metallic_factor: cgltf_float
     roughness_factor: cgltf_float

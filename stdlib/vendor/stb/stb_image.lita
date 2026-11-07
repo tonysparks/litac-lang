@@ -1,0 +1,74 @@
+// stb_image v2.30 bindings (https://github.com/nothings/stb, public domain / MIT).
+// Decodes JPEG, PNG, TGA, BMP, PSD, GIF, HDR and PNM images to 8-bit pixels.
+//
+// Its memory comes from the allocator given to StbiUseAllocator (malloc until then):
+// decoded pixels, and its scratch while decoding. stbi_image_free returns them to it.
+import "std/mem"
+
+@raw("""
+#include <stdlib.h>
+#include <string.h>
+static void* (*stbi_litac_alloc)(void*, size_t);
+static void (*stbi_litac_free)(void*, void*);
+static void* stbi_litac_user;
+static void stbi_litac_set_hooks(void* alloc, void* release, void* user) {
+    stbi_litac_alloc = (void* (*)(void*, size_t))alloc;
+    stbi_litac_free = (void (*)(void*, void*))release;
+    stbi_litac_user = user;
+}
+static void* stbi_litac_malloc(size_t size) {
+    return stbi_litac_alloc ? stbi_litac_alloc(stbi_litac_user, size) : malloc(size);
+}
+static void stbi_litac_release(void* p) {
+    if (stbi_litac_free) { stbi_litac_free(stbi_litac_user, p); } else { free(p); }
+}
+static void* stbi_litac_realloc(void* p, size_t oldSize, size_t newSize) {
+    if (!stbi_litac_alloc) { return realloc(p, newSize); }
+    void* grown = stbi_litac_alloc(stbi_litac_user, newSize);
+    if (grown && p) { memcpy(grown, p, oldSize < newSize ? oldSize : newSize); }
+    stbi_litac_release(p);
+    return grown;
+}
+#define STBI_MALLOC(size) stbi_litac_malloc(size)
+#define STBI_FREE(p) stbi_litac_release(p)
+#define STBI_REALLOC_SIZED(p, oldSize, newSize) stbi_litac_realloc(p, oldSize, newSize)
+#define STB_IMAGE_IMPLEMENTATION
+""");
+@include("stb_image.h");
+
+@compiler_option(
+    .options = "-I{relativePath}"
+);
+
+@foreign public typedef u8 as stbi_uc;
+
+// desired_channels: 0 for the image's own, or 1..4 (grey, grey+alpha, RGB, RGBA)
+@foreign public func stbi_load_from_memory(buffer: *const stbi_uc, len: i32, x: *i32, y: *i32,
+                                           channels_in_file: *i32, desired_channels: i32) : *stbi_uc;
+@foreign public func stbi_load(filename: *const char, x: *i32, y: *i32, channels_in_file: *i32,
+                               desired_channels: i32) : *stbi_uc;
+@foreign public func stbi_image_free(retval_from_stbi_load: *void);
+@foreign public func stbi_failure_reason() : *const char;
+@foreign public func stbi_set_flip_vertically_on_load(flag_true_if_should_flip: i32);
+
+@foreign func stbi_litac_set_hooks(alloc: *void, release: *void, user: *void);
+
+// Where stb_image gets its memory from here on; null goes back to malloc. The allocator
+// must outlive whatever is decoded with it.
+public func StbiUseAllocator(allocator: *const Allocator) {
+    if(!allocator) {
+        stbi_litac_set_hooks(null, null, null)
+        return;
+    }
+    stbi_litac_set_hooks((&StbiAlloc) as (*void), (&StbiFree) as (*void), allocator as (*void))
+}
+
+func StbiAlloc(user: *void, size: usize) : *void {
+    return (user as (*const Allocator)).alloc(size)
+}
+
+func StbiFree(user: *void, p: *void) {
+    if(p) {
+        (user as (*const Allocator)).free(p)
+    }
+}
