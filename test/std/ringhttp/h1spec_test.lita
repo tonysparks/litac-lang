@@ -713,8 +713,8 @@ func testSizeLimits() {
     h1WriteAll(fd, longReq)
     var resp: H1Resp
     h1ReadFull(fd, &resp, false)
-    check(&p, &f, "14.1  overlong URI returns 414 or 400",
-        resp.statusCode == 414 || resp.statusCode == 400)
+    check(&p, &f, "14.1  overlong URI returns 414",
+        resp.statusCode == 414)
 
     // Very long header value — should get 431 Request Header Fields Too Large
     var longVal: [9100]char
@@ -728,8 +728,8 @@ func testSizeLimits() {
     h1WriteAll(fd2, bigHdrReq)
     var resp2: H1Resp
     h1ReadFull(fd2, &resp2, false)
-    check(&p, &f, "14.2  overlong header returns 431 or 400",
-        resp2.statusCode == 431 || resp2.statusCode == 400)
+    check(&p, &f, "14.2  overlong header returns 431",
+        resp2.statusCode == 431)
 
     printf("  %d passed, %d failed\n", p, f); assert(f == 0)
 }
@@ -1471,6 +1471,68 @@ func testIdenticalDuplicateCL() {
     check(&p, &f, "41.2  duplicate Content-Length with different values returns 400",
         h1OneShot(
             "POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 5\r\nContent-Length: 6\r\nConnection: close\r\n\r\nhello") == 400)
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 42: Request read buffer growth and limits ────────────────────────
+
+func h1SendAndStatus(req: *const char) : i32 {
+    var fd = h1Connect(); assert(fd >= 0); defer close(fd)
+    if(!h1WriteAll(fd, req)) { return -1 }
+    var resp: H1Resp
+    h1ReadFull(fd, &resp, false)
+    return resp.statusCode
+}
+
+@test("h1spec_42_request_buffer_limits")
+func testRequestBufferLimits() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 42: Request read buffer growth and limits\n")
+
+    const big = 3 * 1024 * 1024
+    var buf = defaultAllocator.alloc(big) as (*char)
+    assert(buf != null)
+    defer defaultAllocator.free(buf)
+
+    // request line that never terminates must be rejected, not silently dropped
+    memset(buf, 'A' as (i32), 9000_usize)
+    ;buf[0] = 'G'; buf[1] = 'E'; buf[2] = 'T'; buf[3] = ' '; buf[4] = '/'
+    ;buf[9000] = '\0'
+    check(&p, &f, "42.1  unterminated overlong request line returns 414",
+        h1SendAndStatus(buf) == 414)
+
+    // header block that never terminates
+    var n = sprintf(buf, "GET / HTTP/1.1\r\nHost: localhost\r\nX-Big: ")
+    memset(buf + n, 'B' as (i32), 9000_usize)
+    ;buf[n + 9000] = '\0'
+    check(&p, &f, "42.2  unterminated overlong headers return 431",
+        h1SendAndStatus(buf) == 431)
+
+    // chunked body larger than the initial 32KiB read buffer
+    n = sprintf(buf, "POST / HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n")
+    for(var i = 0; i < 25; i += 1) {
+        n += sprintf(buf + n, "1000\r\n")
+        memset(buf + n, 'C' as (i32), 4096_usize)
+        n += 4096
+        n += sprintf(buf + n, "\r\n")
+    }
+    n += sprintf(buf + n, "0\r\n\r\n")
+    check(&p, &f, "42.3  100KiB chunked body returns 200",
+        h1SendAndStatus(buf) == 200)
+
+    // Content-Length body near (but under) the 2MiB default limit
+    const bodyLen = 2 * 1024 * 1024 - 1024
+    n = sprintf(buf, "POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: %d\r\nConnection: close\r\n\r\n", bodyLen)
+    memset(buf + n, 'D' as (i32), bodyLen as (usize))
+    ;buf[n + bodyLen] = '\0'
+    check(&p, &f, "42.4  ~2MiB Content-Length body returns 200",
+        h1SendAndStatus(buf) == 200)
+
+    // Content-Length over the limit is rejected from the headers alone
+    check(&p, &f, "42.5  Content-Length over limit returns 413",
+        h1SendAndStatus("POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 3000000\r\n\r\n") == 413)
 
     printf("  %d passed, %d failed\n", p, f); assert(f == 0)
 }

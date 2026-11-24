@@ -9,6 +9,7 @@ import "std/assert"
 import "std/log"
 import "std/system"
 import "std/array"
+import "std/limits"
 
 import "std/ringhttp/http_connection"
 import "std/ringhttp/http_parser"
@@ -193,6 +194,9 @@ internal func (this: *WorkerThread) sendBadRequest(
     response.status = 400
     response.type   = ResponseType.BODY
 
+    // the rest of the rejected request may still be in flight; it can't be framed as a new request
+    context.connection.disableKeepAlive = true
+
     switch(status) {
         case Status.ERROR_INVALID_REQUEST_PATH_EXCEEDED_LIMIT:
             response.status = 414
@@ -202,6 +206,7 @@ internal func (this: *WorkerThread) sendBadRequest(
             )
             break
         case Status.ERROR_INVALID_HEADER_EXCEEDED_LIMIT:
+            response.status = 431
             response.body.append(
                 "Request exceeded the max request limit of %d bytes for headers\n",
                 this.config.maxHttpHeaderSizeInBytes
@@ -297,6 +302,18 @@ internal func (this: *WorkerThread) sendNotFound(
     return this.queueSend(session)
 }
 
+// Reads are issued into the buffer's free space, so a full buffer would issue a
+// zero-length read that is indistinguishable from the client closing the socket.
+func EnsureReadSpace(readBuffer: *StringBuilder, minFree: usize) : bool {
+    if(readBuffer.remaining() as (usize) >= minFree) {
+        return true
+    }
+    if(minFree > MAX_I32 as (usize)) {
+        return false
+    }
+    return readBuffer.reserve(minFree as (i32))
+}
+
 internal func (this: *WorkerThread) handlePartialHttpRequest(
     request:   *SessionContext,
     bytesRead: i32
@@ -311,8 +328,12 @@ internal func (this: *WorkerThread) handlePartialHttpRequest(
     if(request.requestLineIndex < 1) {
         request.requestLineIndex = buffer.endIndexOf($"\r\n")
         if(request.requestLineIndex < 0) {
-            if(readBuffer.remaining() < this.config.maxHttpRequestLineSizeInBytes) {
-                readBuffer.reserve(readBuffer.capacity + this.config.maxHttpRequestLineSizeInBytes as (i32))
+            if(readBuffer.length > this.config.maxHttpRequestLineSizeInBytes) {
+                return Status.ERROR_INVALID_REQUEST_PATH_EXCEEDED_LIMIT
+            }
+
+            if(!EnsureReadSpace(readBuffer, this.config.maxHttpRequestLineSizeInBytes)) {
+                return Status.ERROR_INVALID_REQUEST_PATH_EXCEEDED_LIMIT
             }
 
             Debug("RequestLine not fully read, waiting for more data: %d\n", connection.handle())
@@ -327,8 +348,12 @@ internal func (this: *WorkerThread) handlePartialHttpRequest(
     if(request.headerIndex < 1) {
         request.headerIndex = buffer.endIndexOf($"\r\n\r\n")
         if(request.headerIndex < 0) {
-            if(readBuffer.remaining() < this.config.maxHttpHeaderSizeInBytes) {
-                readBuffer.reserve(readBuffer.capacity + this.config.maxHttpHeaderSizeInBytes as (i32))
+            if(readBuffer.length - request.requestLineIndex > this.config.maxHttpHeaderSizeInBytes) {
+                return Status.ERROR_INVALID_HEADER_EXCEEDED_LIMIT
+            }
+
+            if(!EnsureReadSpace(readBuffer, this.config.maxHttpHeaderSizeInBytes)) {
+                return Status.ERROR_INVALID_HEADER_EXCEEDED_LIMIT
             }
 
             Debug("Headers not fully read, waiting for more data: %d\n", connection.handle())
@@ -402,6 +427,9 @@ internal func (this: *WorkerThread) handlePartialHttpRequest(
             this.config.maxHttpBodySizeInBytes as (i32)
         )
         if(status == Status.ERROR_HTTP_PARSING_CHUNK_INCOMPLETE) {
+            if(!EnsureReadSpace(readBuffer, READ_BUFFER_SIZE)) {
+                return Status.ERROR_INVALID_BODY_EXCEEDED_LIMIT
+            }
             return Status.PARTIAL_REQUEST_DISPATCHING_READ
         }
         if(status != Status.OK) {
@@ -414,9 +442,10 @@ internal func (this: *WorkerThread) handlePartialHttpRequest(
             return Status.ERROR_INVALID_BODY_EXCEEDED_LIMIT
         }
 
-        if(readBuffer.length - request.headerIndex < bodyLength) {
-            if(readBuffer.remaining() < 1 * MiB) {
-                readBuffer.reserve(readBuffer.capacity + 1 * MiB as (i32))
+        var bodyBytesRead = readBuffer.length - request.headerIndex
+        if(bodyBytesRead < bodyLength) {
+            if(!EnsureReadSpace(readBuffer, (bodyLength - bodyBytesRead) as (usize))) {
+                return Status.ERROR_INVALID_BODY_EXCEEDED_LIMIT
             }
 
             // RFC 7231 §5.1.1: send 100 Continue so the client will send the body.

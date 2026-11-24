@@ -645,134 +645,138 @@ func (this: *WorkerThread) handleReadReady(session: *SessionContext) {
     var connection = &session.connection
     var readBuffer = &connection.readBuffer
 
-    var bytesRead = this.doRecv(
-        session,
-        &readBuffer.buffer[readBuffer.length],
-        readBuffer.remaining() as (i32)
-    )
+    // EV_CLEAR only re-fires on new data, so keep reading until the socket is drained
+    while(true) {
+        var bytesRead = this.doRecv(
+            session,
+            &readBuffer.buffer[readBuffer.length],
+            readBuffer.remaining() as (i32)
+        )
 
-    if(bytesRead == 0) {
-        Debug("Client closed socket: %d\n", connection.handle())
-        this.closeSession(session)
-        return;
-    }
+        if(bytesRead == 0) {
+            Debug("Client closed socket: %d\n", connection.handle())
+            this.closeSession(session)
+            return;
+        }
 
-    if(bytesRead < 0) {
-        return;
-    }
+        if(bytesRead < 0) {
+            return;
+        }
 
-    switch(session.state) {
-        case SessionState.READ_REQUEST_LINE: {
-            var status = this.handlePartialHttpRequest(session, bytesRead as (i32))
+        switch(session.state) {
+            case SessionState.READ_REQUEST_LINE: {
+                var status = this.handlePartialHttpRequest(session, bytesRead as (i32))
 
-            if(status != Status.OK) {
-                switch(status) {
-                    case Status.PARTIAL_REQUEST_DISPATCHING_READ: {
-                        return;
-                    }
-                    case Status.CONTINUE_SEND: {
-                        // this.send100Continue(session)
+                if(status != Status.OK) {
+                    switch(status) {
+                        case Status.PARTIAL_REQUEST_DISPATCHING_READ: {
+                            continue
+                        }
+                        case Status.CONTINUE_SEND: {
+                            // this.send100Continue(session)
 
-                        // RFC 7231 §5.1.1: send 100 Continue without disturbing the session.
-                        // The read buffer still holds the request headers; when the client
-                        // sends the body the EV_CLEAR read event re-fires and the body is
-                        // appended to the same buffer so handlePartialHttpRequest succeeds.
-                        const reply = "HTTP/1.1 100 Continue\r\n\r\n"
-                        send(
-                            session.connection.handle(),
-                            reply as (*void),
-                            strlen(reply) as (usize),
-                            0
-                        )
-                        return;
-                    }
-                    case Status.ERROR_UNKNOWN_BODY_LENGTH:
-                    case Status.ERROR_INVALID_REQUEST_PATH_EXCEEDED_LIMIT:
-                    case Status.ERROR_INVALID_HEADER_EXCEEDED_LIMIT:
-                    case Status.ERROR_INVALID_BODY_EXCEEDED_LIMIT:
-                    case Status.ERROR_PARSING_HTTP_REQUEST:
-                    case Status.ERROR_MISSING_HOST_HEADER:
-                    case Status.ERROR_DUPLICATE_HOST_HEADER:
-                    case Status.ERROR_HTTP_VERSION_NOT_SUPPORTED:
-                    case Status.ERROR_EXPECT_FAILED:
-                    case Status.ERROR_CONFLICTING_BODY_HEADERS:
-                    case Status.ERROR_CONFLICTING_CONTENT_LENGTH:
-                    case Status.ERROR_INVALID_CONTENT_LENGTH:
-                    case Status.ERROR_UNSUPPORTED_REQUEST_METHOD:
-                    case Status.ERROR_WEB_SOCKET_MISSING_CONNECTION:
-                    case Status.ERROR_HTTP_PARSING_INVALID_REQUEST_LINE:
-                    case Status.ERROR_HTTP_PARSING_INVALID_HEADER_PARAM:
-                    case Status.ERROR_HTTP_PARSING_INVALID_CHUNK:
-                    case Status.ERROR_HTTP_PARSING_CHUNK_INCOMPLETE: {
-                        this.sendBadRequest(session, status)
-                        break
-                    }
-                    default: {
-                        this.sendServerError(session, status)
-                        break
-                    }
-                }
-                return;
-            }
-
-            var reqStatus = this.handleHttpRequest(session)
-            if(reqStatus != Status.OK) {
-                if(reqStatus == Status.ERROR_FILE_NOT_FOUND) {
-                    this.sendNotFound(session, reqStatus)
-                }
-                else {
-                    Error("HTTP request error %s for socket: %d\n", StatusAsStr(reqStatus), connection.handle())
-                    // These all mean the client sent a request body we couldn't make sense
-                    // of (malformed multipart boundary/headers, a bad form-urlencoded pair,
-                    // etc.) — a 400, not a 500. Left unclassified, they fell into the
-                    // sendServerError default below and got logged/returned as if cardmng's
-                    // own handler had failed, even though the request never reached routing.
-                    switch(reqStatus) {
+                            // RFC 7231 §5.1.1: send 100 Continue without disturbing the session.
+                            // The read buffer still holds the request headers; when the client
+                            // sends the body the EV_CLEAR read event re-fires and the body is
+                            // appended to the same buffer so handlePartialHttpRequest succeeds.
+                            const reply = "HTTP/1.1 100 Continue\r\n\r\n"
+                            send(
+                                session.connection.handle(),
+                                reply as (*void),
+                                strlen(reply) as (usize),
+                                0
+                            )
+                            return;
+                        }
+                        case Status.ERROR_UNKNOWN_BODY_LENGTH:
+                        case Status.ERROR_INVALID_REQUEST_PATH_EXCEEDED_LIMIT:
+                        case Status.ERROR_INVALID_HEADER_EXCEEDED_LIMIT:
+                        case Status.ERROR_INVALID_BODY_EXCEEDED_LIMIT:
                         case Status.ERROR_PARSING_HTTP_REQUEST:
-                        case Status.ERROR_WEB_SOCKET_SECURITY_KEY:
-                        case Status.ERROR_HTTP_PARSING_INVALID_FORM_URLENCODED_PARAM:
-                        case Status.ERROR_HTTP_PARSING_INVALID_MULTIPART_SECTION:
-                        case Status.ERROR_HTTP_PARSING_INVALID_MULTIPART_BOUNDARY:
-                        case Status.ERROR_HTTP_PARSING_INVALID_MULTIPART_HEADER:
-                        case Status.ERROR_HTTP_PARSING_INVALID_MULTIPART: {
-                            this.sendBadRequest(session, reqStatus)
+                        case Status.ERROR_MISSING_HOST_HEADER:
+                        case Status.ERROR_DUPLICATE_HOST_HEADER:
+                        case Status.ERROR_HTTP_VERSION_NOT_SUPPORTED:
+                        case Status.ERROR_EXPECT_FAILED:
+                        case Status.ERROR_CONFLICTING_BODY_HEADERS:
+                        case Status.ERROR_CONFLICTING_CONTENT_LENGTH:
+                        case Status.ERROR_INVALID_CONTENT_LENGTH:
+                        case Status.ERROR_UNSUPPORTED_REQUEST_METHOD:
+                        case Status.ERROR_WEB_SOCKET_MISSING_CONNECTION:
+                        case Status.ERROR_HTTP_PARSING_INVALID_REQUEST_LINE:
+                        case Status.ERROR_HTTP_PARSING_INVALID_HEADER_PARAM:
+                        case Status.ERROR_HTTP_PARSING_INVALID_CHUNK:
+                        case Status.ERROR_HTTP_PARSING_CHUNK_INCOMPLETE: {
+                            this.sendBadRequest(session, status)
                             break
                         }
                         default: {
-                            this.sendServerError(session, reqStatus)
+                            this.sendServerError(session, status)
                             break
                         }
                     }
+                    return;
                 }
+
+                var reqStatus = this.handleHttpRequest(session)
+                if(reqStatus != Status.OK) {
+                    if(reqStatus == Status.ERROR_FILE_NOT_FOUND) {
+                        this.sendNotFound(session, reqStatus)
+                    }
+                    else {
+                        Error("HTTP request error %s for socket: %d\n", StatusAsStr(reqStatus), connection.handle())
+                        // These all mean the client sent a request body we couldn't make sense
+                        // of (malformed multipart boundary/headers, a bad form-urlencoded pair,
+                        // etc.) — a 400, not a 500. Left unclassified, they fell into the
+                        // sendServerError default below and got logged/returned as if cardmng's
+                        // own handler had failed, even though the request never reached routing.
+                        switch(reqStatus) {
+                            case Status.ERROR_PARSING_HTTP_REQUEST:
+                            case Status.ERROR_WEB_SOCKET_SECURITY_KEY:
+                            case Status.ERROR_HTTP_PARSING_INVALID_FORM_URLENCODED_PARAM:
+                            case Status.ERROR_HTTP_PARSING_INVALID_MULTIPART_SECTION:
+                            case Status.ERROR_HTTP_PARSING_INVALID_MULTIPART_BOUNDARY:
+                            case Status.ERROR_HTTP_PARSING_INVALID_MULTIPART_HEADER:
+                            case Status.ERROR_HTTP_PARSING_INVALID_MULTIPART: {
+                                this.sendBadRequest(session, reqStatus)
+                                break
+                            }
+                            default: {
+                                this.sendServerError(session, reqStatus)
+                                break
+                            }
+                        }
+                    }
+                }
+                break
             }
-            break
-        }
-        case SessionState.WEB_SOCKET_OPERATION: {
-            var status = this.handleWebSocketFrame(session, bytesRead as (i32))
-            if(status == Status.WEB_SOCKET_CLOSED) {
+            case SessionState.WEB_SOCKET_OPERATION: {
+                var status = this.handleWebSocketFrame(session, bytesRead as (i32))
+                if(status == Status.WEB_SOCKET_CLOSED) {
+                    this.closeSession(session)
+                }
+                else if(status == Status.PARTIAL_WEB_SOCKET_DISPATCHING_READ) {
+                    continue
+                }
+                else if(status != Status.OK) {
+                    Error("WebSocket frame error for socket: %d: %s\n",
+                        connection.handle(), StatusAsStr(status))
+                    this.closeSession(session)
+                }
+                break
+            }
+            case SessionState.SSE_OPERATION: {
+                // SSE is server-push only; unexpected client data closes the connection
+                Debug("Unexpected read on SSE socket: %d, closing\n", connection.handle())
                 this.closeSession(session)
+                break
             }
-            else if(status == Status.PARTIAL_WEB_SOCKET_DISPATCHING_READ) {
-                return;
+            default: {
+                Warn("Unexpected read in state %s for socket: %d\n",
+                    SessionStateAsStr(session.state), connection.handle())
+                break
             }
-            else if(status != Status.OK) {
-                Error("WebSocket frame error for socket: %d: %s\n",
-                    connection.handle(), StatusAsStr(status))
-                this.closeSession(session)
-            }
-            break
         }
-        case SessionState.SSE_OPERATION: {
-            // SSE is server-push only; unexpected client data closes the connection
-            Debug("Unexpected read on SSE socket: %d, closing\n", connection.handle())
-            this.closeSession(session)
-            break
-        }
-        default: {
-            Warn("Unexpected read in state %s for socket: %d\n",
-                SessionStateAsStr(session.state), connection.handle())
-            break
-        }
+        return;
     }
 }
 

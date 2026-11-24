@@ -9,7 +9,15 @@
 // trees and tooltips. The C header is authoritative for layout.
 // Without font baking Nuklear doesn't need its embedded copy of stb_rect_pack, whose
 // declarations would make stb_truetype (vendor/stb) expect the real thing: skipped.
+// Nuklear's own number formatting is imprecise (1.3 shows as 1.29): numbers go through
+// snprintf instead (its buffers are NK_MAX_NUMBER_BUFFER, 64, long).
 @raw("""
+#include <stdio.h>
+static char* nk_litac_dtoa(char* s, double n) {
+    snprintf(s, 64, "%.6f", n);
+    return s;
+}
+#define NK_DTOA nk_litac_dtoa
 #define NK_INCLUDE_FIXED_TYPES
 #define NK_INCLUDE_VERTEX_BUFFER_OUTPUT
 #define NK_IMPLEMENTATION
@@ -157,6 +165,9 @@
 @foreign public const NK_DYNAMIC: i32;
 @foreign public const NK_STATIC: i32;
 
+@foreign public const NK_HIDDEN: i32;
+@foreign public const NK_SHOWN: i32;
+
 @foreign public const NK_TREE_NODE: i32;
 @foreign public const NK_TREE_TAB: i32;
 @foreign public const NK_MINIMIZED: u32;
@@ -236,6 +247,7 @@
 @foreign public func nk_window_is_closed(ctx: *const nk_context, name: *const char) : nk_bool;
 @foreign public func nk_window_is_any_hovered(ctx: *const nk_context) : nk_bool;
 @foreign public func nk_window_set_focus(ctx: *nk_context, name: *const char);
+@foreign public func nk_window_show(ctx: *nk_context, name: *const char, state: i32);
 @foreign public func nk_window_get_bounds(ctx: *const nk_context) : nk_rect;
 @foreign public func nk_item_is_any_active(ctx: *const nk_context) : nk_bool;
 

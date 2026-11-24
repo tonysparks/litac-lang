@@ -363,7 +363,7 @@ func test_path_parameters_retrieval_hit_header_limit() {
 
     var x = resp.body.trim().cStr()
     //printf("Resp: %d Body: '%s'\n", resp.statusCode, x)
-    assert(resp.statusCode == 400)
+    assert(resp.statusCode == 431)
     assert("Request exceeded the max request limit of 8192 bytes for headers".equals(x))
 }
 
